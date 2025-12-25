@@ -36,6 +36,9 @@
     <string name="add_to_favorites">Добавить в избранное</string>
     <string name="remove_from_favorites">Удалить из избранного</string>
     
+    <!-- Retry Map Loading -->
+    <string name="map_retry">Повторить загрузку карты</string>
+    
     <!-- Categories -->
     <string name="category_all">Все</string>
     <string name="category_nature">Природа</string>
