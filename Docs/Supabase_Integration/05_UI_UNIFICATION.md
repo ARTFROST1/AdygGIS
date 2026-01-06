@@ -211,15 +211,6 @@ private fun ExtendedInfoSection(attraction: Attraction) {
             )
         }
         
-        // Difficulty
-        attraction.difficulty?.let { difficulty ->
-            InfoRow(
-                icon = Icons.Default.Hiking,
-                label = stringResource(R.string.difficulty),
-                value = difficulty
-            )
-        }
-        
         // Best Time to Visit
         attraction.bestTimeToVisit?.let { bestTime ->
             InfoRow(
@@ -273,14 +264,12 @@ private fun InfoRow(
 <string name="additional_info">Дополнительная информация</string>
 <string name="operating_season">Сезон работы</string>
 <string name="duration">Продолжительность</string>
-<string name="difficulty">Сложность</string>
 <string name="best_time_to_visit">Лучшее время для посещения</string>
 
 <!-- values-en/strings.xml - ДОБАВИТЬ -->
 <string name="additional_info">Additional Information</string>
 <string name="operating_season">Operating Season</string>
 <string name="duration">Duration</string>
-<string name="difficulty">Difficulty</string>
 <string name="best_time_to_visit">Best Time to Visit</string>
 ```
 

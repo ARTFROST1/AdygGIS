@@ -1,8 +1,10 @@
 # ✅ Финальный чеклист рефакторинга Kotlin → Supabase
 
-**Дата:** 5 января 2026  
-**Версия:** 1.0  
-**Статус:** План рефакторинга
+**Дата:** 6 января 2026  
+**Версия:** 1.1  
+**Статус:** ✅ Реализовано (offline-first Supabase sync в приложении)
+
+> Note: пункты, связанные с созданием/настройкой Supabase проекта и загрузкой данных, зависят от окружения.
 
 ---
 
@@ -77,17 +79,16 @@
 
 | Файл | Действие | Статус |
 |------|----------|--------|
-| `data/remote/dto/AttractionDto.kt` | Обновить @SerialName для snake_case | ⬜ |
-| `data/remote/dto/AttractionDto.kt` | Добавить extended fields | ⬜ |
-| `data/remote/dto/AttractionDto.kt` | Добавить metadata fields | ⬜ |
-| `data/remote/dto/AttractionDto.kt` | УДАЛИТЬ isFavorite | ⬜ |
-| `data/remote/dto/SyncMetadataDto.kt` | СОЗДАТЬ | ⬜ |
-| `data/local/entities/AttractionEntity.kt` | Добавить extended fields | ⬜ |
-| `data/local/entities/AttractionEntity.kt` | Добавить lastSyncedAt | ⬜ |
-| `domain/model/Attraction.kt` | Добавить extended fields | ⬜ |
-| `data/mapper/AttractionMapper.kt` | Обновить маппинг | ⬜ |
-| `data/local/database/Migrations.kt` | Создать миграцию | ⬜ |
-| `data/local/database/AdygyesDatabase.kt` | Обновить версию | ⬜ |
+| `data/remote/dto/AttractionDto.kt` | Обновить @SerialName для snake_case | ✅ |
+| `data/remote/dto/AttractionDto.kt` | Добавить extended fields | ✅ |
+| `data/remote/dto/AttractionDto.kt` | Добавить metadata fields | ✅ |
+| `data/remote/dto/AttractionDto.kt` | УДАЛИТЬ isFavorite | ✅ |
+| `data/remote/dto/SyncMetadataDto.kt` | СОЗДАТЬ | ✅ |
+| `data/local/entities/AttractionEntity.kt` | Добавить extended fields | ✅ |
+| `data/local/entities/AttractionEntity.kt` | Добавить lastSyncedAt | ✅ |
+| `domain/model/Attraction.kt` | Добавить extended fields | ✅ |
+| `data/mapper/AttractionMapper.kt` | Обновить маппинг | ✅ |
+| `data/local/database/AdygyesDatabase.kt` | Обновить версию + MIGRATION_1_2 | ✅ |
 
 ### Детали изменений
 
@@ -98,7 +99,6 @@
 @SerialName("price_info") val priceInfo: String?          // было priceInfo
 @SerialName("operating_season") val operatingSeason: String?  // 🆕
 @SerialName("duration") val duration: String?                  // 🆕
-@SerialName("difficulty") val difficulty: String?              // 🆕
 @SerialName("best_time_to_visit") val bestTimeToVisit: String? // 🆕
 @SerialName("reviews_count") val reviewsCount: Int?             // 🆕 (для UI отзывов)
 @SerialName("average_rating") val averageRating: Float?         // 🆕 (для UI отзывов)
@@ -116,15 +116,15 @@
 
 | Файл | Действие | Статус |
 |------|----------|--------|
-| `local.properties` | Добавить SUPABASE_URL, SUPABASE_ANON_KEY | ⬜ |
-| `.gitignore` | Убедиться что local.properties игнорируется | ⬜ |
-| `app/build.gradle.kts` | Добавить BuildConfig fields | ⬜ |
-| `gradle/libs.versions.toml` | Проверить Retrofit dependencies | ⬜ |
-| `data/remote/config/SupabaseConfig.kt` | СОЗДАТЬ | ⬜ |
-| `data/remote/api/SupabaseApiService.kt` | СОЗДАТЬ | ⬜ |
-| `data/remote/SupabaseRemoteDataSource.kt` | СОЗДАТЬ | ⬜ |
-| `di/module/NetworkModule.kt` | СОЗДАТЬ | ⬜ |
-| `di/module/AppModule.kt` | Добавить RemoteDataSource | ⬜ |
+| `local.properties` | Добавить SUPABASE_URL, SUPABASE_ANON_KEY | ✅ (если заполнено локально) |
+| `.gitignore` | Убедиться что local.properties игнорируется | ✅ |
+| `app/build.gradle.kts` | Добавить BuildConfig fields | ✅ |
+| `gradle/libs.versions.toml` | Проверить Retrofit dependencies | ✅ |
+| `data/remote/config/SupabaseConfig.kt` | СОЗДАТЬ | ✅ |
+| `data/remote/api/SupabaseApiService.kt` | СОЗДАТЬ | ✅ |
+| `data/remote/SupabaseRemoteDataSource.kt` | СОЗДАТЬ | ✅ |
+| `di/module/NetworkModule.kt` | СОЗДАТЬ | ✅ |
+| `di/module/AppModule.kt` | Добавить RemoteDataSource | ⚠️ (используются NetworkModule/SyncModule) |
 
 ### Ключевые моменты
 
@@ -148,15 +148,14 @@ Content-Type: application/json
 
 | Файл | Действие | Статус |
 |------|----------|--------|
-| `data/sync/SyncResult.kt` | СОЗДАТЬ | ⬜ |
-| `data/sync/SyncState.kt` | СОЗДАТЬ | ⬜ |
-| `data/sync/SyncService.kt` | СОЗДАТЬ | ⬜ |
-| `data/sync/SyncManager.kt` | СОЗДАТЬ | ⬜ |
-| `data/sync/NetworkMonitor.kt` | СОЗДАТЬ | ⬜ |
-| `data/local/preferences/PreferencesManager.kt` | Добавить lastSyncTimestamp | ⬜ |
-| `data/local/dao/AttractionDao.kt` | Добавить sync методы | ⬜ |
-| `data/repository/AttractionRepositoryImpl.kt` | Интегрировать SyncManager | ⬜ |
-| `presentation/viewmodel/MapViewModel.kt` | Добавить syncState | ⬜ |
+| `data/sync/SyncModels.kt` | SyncResult + SyncState (объединено) | ✅ |
+| `data/sync/SyncService.kt` | СОЗДАТЬ | ✅ |
+| `data/sync/SyncManager.kt` | СОЗДАТЬ | ✅ |
+| `data/sync/NetworkMonitor.kt` | СОЗДАТЬ | ✅ |
+| `data/local/preferences/PreferencesManager.kt` | Добавить lastSyncTimestamp | ✅ |
+| `data/local/dao/AttractionDao.kt` | Добавить sync методы | ✅ |
+| `data/repository/AttractionRepositoryImpl.kt` | Интегрировать SyncManager | ⚠️ (зависит от текущей реализации репозитория) |
+| `presentation/viewmodel/MapViewModel.kt` | Добавить syncState | ⚠️ (есть initial sync вызов; UI-state можно доработать) |
 
 ### Sync логика
 
@@ -200,7 +199,6 @@ Content-Type: application/json
 ExtendedInfoSection(
     operatingSeason = attraction.operatingSeason,
     duration = attraction.duration,
-    difficulty = attraction.difficulty,
     bestTimeToVisit = attraction.bestTimeToVisit
 )
 ```
@@ -251,7 +249,7 @@ ExtendedInfoSection(
 | Выполнить SQL миграции | attractions + sync_metadata tables | ⬜ |
 | Настроить RLS policies | Public read, admin write | ⬜ |
 | Создать Storage bucket | images bucket | ⬜ |
-| Запустить скрипт миграции | JSON → Supabase | ⬜ |
+| Опционально: миграция seed данных | JSON → Supabase (one-off) | ⬜ |
 | Верифицировать данные | Проверить все записи | ⬜ |
 | Протестировать API | curl/Postman запросы | ⬜ |
 | Протестировать приложение | E2E тест | ⬜ |

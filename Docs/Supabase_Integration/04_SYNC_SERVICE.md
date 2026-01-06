@@ -1,8 +1,8 @@
 # 🔄 Сервис синхронизации Kotlin ↔ Supabase
 
-**Дата:** 5 января 2026  
-**Версия:** 1.0  
-**Статус:** План рефакторинга
+**Дата:** 6 января 2026  
+**Версия:** 1.1  
+**Статус:** ✅ Core реализован (актуализировано по коду)
 
 ---
 
@@ -59,6 +59,12 @@
 ---
 
 ## 🔧 SyncService
+
+Фактическая реализация находится в:
+- `app/src/main/java/com/adygyes/app/data/sync/SyncService.kt`
+- `app/src/main/java/com/adygyes/app/data/sync/SyncManager.kt`
+- `app/src/main/java/com/adygyes/app/data/sync/NetworkMonitor.kt`
+- `app/src/main/java/com/adygyes/app/data/remote/*` (Supabase API)
 
 ### Создать `SyncService.kt`
 

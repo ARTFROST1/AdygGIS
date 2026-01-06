@@ -1,5 +1,8 @@
 # Улучшение UX при обновлении данных - DataUpdateOverlay
 
+> Status (2026-01-06): this document targets UX for the **legacy JSON version update** path.
+> With offline-first Supabase sync, updates should happen in background while UI reads Room; users should not be blocked on JSON version changes.
+
 ## Проблема
 
 При первом запуске после смены версии файла `attractions.json` карта оставалась пустой в течение 10+ секунд, что создавало плохой пользовательский опыт. Пользователи не понимали, что происходит обновление данных.

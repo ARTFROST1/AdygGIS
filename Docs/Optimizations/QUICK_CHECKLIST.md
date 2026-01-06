@@ -1,5 +1,8 @@
 # ⚡ Быстрый чеклист оптимизации APK
 
+> Note (2026-01-06): under offline-first Supabase sync, treat `assets/attractions.json` as **legacy fallback/seed**.
+> The JSON minification step is optional and should only be used if you keep shipping the fallback JSON.
+
 **Время выполнения**: 15-20 минут  
 **Ожидаемая экономия**: ~2.5-2.7 MB (30-40%)
 
@@ -49,7 +52,7 @@ del app\src\main\assets\geo_objects.json
 
 ---
 
-### 3. Минифицировать JSON (2 мин)
+### 3. Минифицировать JSON (опционально, legacy fallback) (2 мин)
 
 ```bash
 # Запустить скрипт
@@ -57,7 +60,7 @@ minify_json.bat
 
 # Проверить результат attractions_minified.json
 
-# Если OK - заменить:
+# Если OK и вы хотите оптимизировать legacy fallback файл - заменить:
 del app\src\main\assets\attractions.json
 ren app\src\main\assets\attractions_minified.json attractions.json
 ```

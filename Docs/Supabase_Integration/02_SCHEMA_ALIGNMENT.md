@@ -1,8 +1,8 @@
 # 📊 Выравнивание схемы данных: Kotlin ↔ Supabase ↔ RN
 
-**Дата:** 5 января 2026  
-**Версия:** 1.0  
-**Статус:** План рефакторинга
+**Дата:** 6 января 2026  
+**Версия:** 1.1  
+**Статус:** ✅ Актуально (реализовано в коде Kotlin)
 
 ---
 
@@ -18,7 +18,7 @@
 
 ## 🗂️ Текущие модели данных
 
-### Kotlin: AttractionDto (текущая)
+### Kotlin: AttractionDto (актуальная)
 
 ```kotlin
 // data/remote/dto/AttractionDto.kt
@@ -34,14 +34,29 @@ data class AttractionDto(
     @SerialName("directions") val directions: String? = null,
     @SerialName("images") val images: List<String> = emptyList(),
     @SerialName("rating") val rating: Float? = null,
-    @SerialName("workingHours") val workingHours: String? = null,
-    @SerialName("phoneNumber") val phoneNumber: String? = null,
+
+    // Reviews aggregate (computed by Supabase trigger)
+    @SerialName("reviews_count") val reviewsCount: Int? = null,
+    @SerialName("average_rating") val averageRating: Float? = null,
+
+    // Contact info (snake_case)
+    @SerialName("working_hours") val workingHours: String? = null,
+    @SerialName("phone_number") val phoneNumber: String? = null,
     @SerialName("email") val email: String? = null,
     @SerialName("website") val website: String? = null,
-    @SerialName("isFavorite") val isFavorite: Boolean = false,
     @SerialName("tags") val tags: List<String> = emptyList(),
-    @SerialName("priceInfo") val priceInfo: String? = null,
-    @SerialName("amenities") val amenities: List<String> = emptyList()
+    @SerialName("price_info") val priceInfo: String? = null,
+    @SerialName("amenities") val amenities: List<String> = emptyList(),
+
+    // Extended fields (унификация с RN)
+    @SerialName("operating_season") val operatingSeason: String? = null,
+    @SerialName("duration") val duration: String? = null,
+    @SerialName("best_time_to_visit") val bestTimeToVisit: String? = null,
+
+    // Supabase metadata
+    @SerialName("is_published") val isPublished: Boolean = true,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null
 )
 ```
 
@@ -71,7 +86,6 @@ interface RawAttractionData {
   // Дополнительные поля в RN
   operatingSeason?: string;
   duration?: string;
-  difficulty?: string;
   bestTimeToVisit?: string;
 }
 ```
@@ -118,8 +132,13 @@ CREATE TABLE attractions (
   
   -- Extended info (из RN, добавить в Kotlin)
   operating_season TEXT,
-  duration TEXT,
-  difficulty TEXT,
+    duration TEXT,
+    best_time_to_visit TEXT,
+
+    -- Supabase metadata
+    is_published BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
   best_time_to_visit TEXT,
   
   -- Metadata
@@ -188,7 +207,6 @@ CREATE UNIQUE INDEX ux_reviews_attraction_user ON reviews(attraction_id, user_id
 | amenities | amenities | TEXT[] → List<String> | ✅ Без изменений |
 | **operating_season** | operatingSeason | TEXT → String? | 🆕 Добавить |
 | duration | duration | TEXT → String? | 🆕 Добавить |
-| difficulty | difficulty | TEXT → String? | 🆕 Добавить |
 | **best_time_to_visit** | bestTimeToVisit | TEXT → String? | 🆕 Добавить |
 | **is_published** | isPublished | BOOLEAN → Boolean | 🆕 Добавить |
 | **created_at** | createdAt | TIMESTAMPTZ → String | 🆕 Добавить |
@@ -265,9 +283,6 @@ data class AttractionDto(
     @SerialName("duration")
     val duration: String? = null,
     
-    @SerialName("difficulty")
-    val difficulty: String? = null,
-    
     @SerialName("best_time_to_visit")
     val bestTimeToVisit: String? = null,
     
@@ -315,7 +330,6 @@ data class AttractionEntity(
     // 🆕 ДОБАВИТЬ расширенные поля
     val operatingSeason: String?,
     val duration: String?,
-    val difficulty: String?,
     val bestTimeToVisit: String?,
     
     // 🆕 ДОБАВИТЬ метаданные синхронизации
@@ -350,7 +364,6 @@ data class Attraction(
     // 🆕 ДОБАВИТЬ
     val operatingSeason: String? = null,
     val duration: String? = null,
-    val difficulty: String? = null,
     val bestTimeToVisit: String? = null,
     
     // Локальные поля
@@ -386,7 +399,6 @@ object AttractionMapper {
             // 🆕 Новые поля
             operatingSeason = operatingSeason,
             duration = duration,
-            difficulty = difficulty,
             bestTimeToVisit = bestTimeToVisit,
             isPublished = isPublished,
             createdAt = createdAt,
@@ -419,20 +431,10 @@ object AttractionMapper {
 ### Room Migration
 
 ```kotlin
-// data/local/database/Migrations.kt
-val MIGRATION_X_Y = object : Migration(X, Y) {
-    override fun migrate(database: SupportSQLiteDatabase) {
-        // Добавить новые колонки
-        database.execSQL("ALTER TABLE attractions ADD COLUMN operatingSeason TEXT")
-        database.execSQL("ALTER TABLE attractions ADD COLUMN duration TEXT")
-        database.execSQL("ALTER TABLE attractions ADD COLUMN difficulty TEXT")
-        database.execSQL("ALTER TABLE attractions ADD COLUMN bestTimeToVisit TEXT")
-        database.execSQL("ALTER TABLE attractions ADD COLUMN isPublished INTEGER NOT NULL DEFAULT 1")
-        database.execSQL("ALTER TABLE attractions ADD COLUMN createdAt TEXT")
-        database.execSQL("ALTER TABLE attractions ADD COLUMN updatedAt TEXT")
-        database.execSQL("ALTER TABLE attractions ADD COLUMN lastSyncedAt INTEGER NOT NULL DEFAULT 0")
-    }
-}
+// data/local/database/AdygyesDatabase.kt
+// v1 -> v2: добавлены extended + metadata + lastSyncedAt
+// v2 -> v3: устранение дрейфа схемы (в некоторых локальных БД встречалась колонка difficulty)
+//          миграция пересоздаёт таблицу attractions без difficulty.
 ```
 
 ---

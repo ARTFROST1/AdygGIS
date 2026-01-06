@@ -44,12 +44,12 @@
 
 #### **4. НЕИСПОЛЬЗУЕМЫЕ ЗАВИСИМОСТИ**
 - ⚠️ `accompanist-pager` - проверить использование
-- ⚠️ `retrofit` + `okhttp` - если нет сетевых запросов (только assets/attractions.json)
+- ⚠️ `retrofit` + `okhttp` - **нельзя удалять** при offline-first Supabase sync (используются для сетевых запросов)
 - ⚠️ `coil-svg` - если SVG не используются
 - ⚠️ Firebase библиотеки (определены в toml, но не подключены в build.gradle)
 
 #### **5. ASSETS ОПТИМИЗАЦИЯ**
-- ⚠️ `attractions.json` (57KB) - проверить возможность минификации
+- ⚠️ `attractions.json` (57KB) - legacy fallback/seed; минификация опциональна
 - ⚠️ `geo_objects.json` (9KB) - проверить использование
 - ✗ `assets/images/` - пустая папка (удалить)
 

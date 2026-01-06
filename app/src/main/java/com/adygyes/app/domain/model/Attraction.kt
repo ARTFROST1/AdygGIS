@@ -4,6 +4,10 @@ import java.util.UUID
 
 /**
  * Domain model representing a tourist attraction or point of interest
+ * 
+ * This model contains all fields needed for the UI layer.
+ * Extended fields (operatingSeason, duration, bestTimeToVisit)
+ * are now unified across all platforms (Kotlin, RN, Admin Panel).
  */
 data class Attraction(
     val id: String = UUID.randomUUID().toString(),
@@ -18,7 +22,16 @@ data class Attraction(
     val isFavorite: Boolean = false,
     val tags: List<String> = emptyList(),
     val priceInfo: String? = null,
-    val amenities: List<String> = emptyList()
+    val amenities: List<String> = emptyList(),
+    
+    // Reviews aggregate (from Supabase trigger)
+    val reviewsCount: Int? = null,
+    val averageRating: Float? = null,
+    
+    // Extended fields (unified across platforms)
+    val operatingSeason: String? = null,
+    val duration: String? = null,
+    val bestTimeToVisit: String? = null
 )
 
 /**

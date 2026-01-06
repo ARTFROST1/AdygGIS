@@ -56,8 +56,30 @@ fun SplashScreen(
         }
     }
     
+    // Safety net:
+    // Splash is shown before MapHost/Map init is composed in many navigation flows.
+    // In that case preloadManager/preloadState is null and we'd be stuck forever.
+    // Also, if preloading fails/hangs, don't block entry indefinitely.
+    var allowProceedFallback by remember { mutableStateOf(false) }
+
+    LaunchedEffect(preloadManager) {
+        // If preloader isn't available on Splash, allow proceed shortly.
+        if (preloadManager == null) {
+            delay(600)
+            allowProceedFallback = true
+        } else {
+            allowProceedFallback = false
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // Hard timeout in case preloading never reaches allMarkersReady.
+        delay(10_000)
+        allowProceedFallback = true
+    }
+
     // Check if everything is fully loaded
-    val isFullyLoaded = preloadState?.value?.allMarkersReady == true
+    val isFullyLoaded = allowProceedFallback || preloadState?.value?.allMarkersReady == true
     // Use system default font family for compatibility
     val ralewayFontFamily = FontFamily.Default
     
@@ -121,7 +143,7 @@ fun SplashScreen(
             ) {
                 // Preload progress indicator (visible while loading)
                 val progress = preloadState?.value?.progress ?: 0f
-                val isLoading = preloadState?.value?.isLoading ?: false
+                val isLoading = !isFullyLoaded && (preloadState?.value?.isLoading ?: true)
                 
                 AnimatedVisibility(
                     visible = isLoading && !navigateWhenReady,

@@ -4,7 +4,10 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Data Transfer Object for attractions from JSON
+ * Data Transfer Object for attractions from Supabase
+ * 
+ * Uses snake_case for @SerialName to match Supabase PostgreSQL column names.
+ * Note: isFavorite is NOT included here - it's a local-only field stored in Room.
  */
 @Serializable
 data class AttractionDto(
@@ -38,10 +41,18 @@ data class AttractionDto(
     @SerialName("rating")
     val rating: Float? = null,
     
-    @SerialName("workingHours")
+    // Reviews aggregate fields (computed by Supabase trigger)
+    @SerialName("reviews_count")
+    val reviewsCount: Int? = null,
+    
+    @SerialName("average_rating")
+    val averageRating: Float? = null,
+    
+    // Contact info - snake_case to match Supabase
+    @SerialName("working_hours")
     val workingHours: String? = null,
     
-    @SerialName("phoneNumber")
+    @SerialName("phone_number")
     val phoneNumber: String? = null,
     
     @SerialName("email")
@@ -50,21 +61,39 @@ data class AttractionDto(
     @SerialName("website")
     val website: String? = null,
     
-    @SerialName("isFavorite")
-    val isFavorite: Boolean = false,
-    
     @SerialName("tags")
     val tags: List<String> = emptyList(),
     
-    @SerialName("priceInfo")
+    @SerialName("price_info")
     val priceInfo: String? = null,
     
     @SerialName("amenities")
-    val amenities: List<String> = emptyList()
+    val amenities: List<String> = emptyList(),
+    
+    // Extended fields from RN (now unified across platforms)
+    @SerialName("operating_season")
+    val operatingSeason: String? = null,
+    
+    @SerialName("duration")
+    val duration: String? = null,
+    
+    @SerialName("best_time_to_visit")
+    val bestTimeToVisit: String? = null,
+    
+    // Metadata fields from Supabase
+    @SerialName("is_published")
+    val isPublished: Boolean = true,
+    
+    @SerialName("created_at")
+    val createdAt: String? = null,
+    
+    @SerialName("updated_at")
+    val updatedAt: String? = null
 )
 
 /**
- * Root object for JSON parsing
+ * Root object for legacy JSON parsing (attractions.json file)
+ * Kept for backward compatibility with local JSON data
  */
 @Serializable
 data class AttractionsResponse(

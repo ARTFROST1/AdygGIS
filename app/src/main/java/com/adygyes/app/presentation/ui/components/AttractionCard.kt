@@ -14,12 +14,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +44,17 @@ import com.adygyes.app.presentation.theme.getContentTextColor
 
 /**
  * Reusable attraction card component
+ * Unified with RN AttractionCard component
+ * 
+ * Layout structure (matching RN):
+ * - Image container with overlay
+ *   - Favorite button (top-right)
+ *   - Category chip (bottom-left, small, no emoji)
+ * - Content section
+ *   - Title (2 lines max)
+ *   - Meta row: emoji + category name + rating
+ *   - Description (2 lines, optional)
+ *   - Address row with icon
  */
 @Composable
 fun AttractionCard(
@@ -51,198 +64,228 @@ fun AttractionCard(
     modifier: Modifier = Modifier,
     showDistance: Boolean = false,
     distance: Float? = null,
+    showDescription: Boolean = true,
+    imageHeight: Int = 180,
     compactForFavorites: Boolean = false
 ) {
     val hasImage = attraction.images.isNotEmpty()
     val imageUrl = attraction.images.firstOrNull()
+    
     Card(
         onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(280.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.CornerRadiusMedium),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Box {
-            if (hasImage && imageUrl != null) {
-                // Image with gradient overlay
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imageUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = attraction.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                // Gradient overlay for image
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            androidx.compose.ui.graphics.Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.7f)
-                                ),
-                                startY = 100f
-                            )
+        Column {
+            // Image Container (like RN imageContainer)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(imageHeight.dp)
+            ) {
+                if (hasImage && imageUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(imageUrl)
+                            .crossfade(200)
+                            .build(),
+                        contentDescription = attraction.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    
+                    // Gradient overlay (subtle, like RN)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.1f))
+                    )
+                } else {
+                    // Fallback when no image
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                )
-            } else {
-                // Solid background when no image
+                    }
+                }
+                
+                // Favorite button (top-right, like RN)
+                IconButton(
+                    onClick = onFavoriteClick,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(40.dp)
+                        .background(
+                            color = Color.Black.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(20.dp)
+                        )
+                ) {
+                    AnimatedContent(
+                        targetState = attraction.isFavorite,
+                        transitionSpec = {
+                            scaleIn(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                )
+                            ) togetherWith scaleOut(animationSpec = tween(150))
+                        }
+                    ) { isFavorite ->
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (isFavorite) 
+                                stringResource(R.string.cd_remove_from_favorites) 
+                            else 
+                                stringResource(R.string.cd_add_to_favorites),
+                            tint = if (isFavorite) Color(0xFFE53935) else Color.White, // Red for favorite, white for not
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                
+                // Category chip (bottom-left, small, no emoji - like RN categoryOverlay)
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
+                        .align(Alignment.BottomStart)
+                        .padding(8.dp)
+                ) {
+                    CategoryChip(
+                        category = attraction.category,
+                        size = ChipSize.SMALL,
+                        showEmoji = false,
+                        showLabel = true
+                    )
+                }
             }
-
-            // Content
+            
+            // Content section (like RN content)
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(Dimensions.PaddingMedium)
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Top row with category and favorite
+                // Title
+                Text(
+                    text = attraction.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                // Meta row: emoji + category + rating (like RN metaRow)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (!compactForFavorites) {
-                        CategoryChip(
-                            category = attraction.category,
-                            modifier = Modifier.padding(top = Dimensions.PaddingExtraSmall)
-                        )
-                    } else {
-                        // Пустое место в компактном режиме, чтобы кнопка была справа
-                        Spacer(modifier = Modifier.width(1.dp))
-                    }
-
-                    IconButton(
-                        onClick = onFavoriteClick,
-                        modifier = Modifier
-                            .size(if (compactForFavorites) 44.dp else 40.dp)
-                            .offset(x = 8.dp, y = (-8).dp)
+                    // Category with emoji
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        AnimatedContent(
-                            targetState = attraction.isFavorite,
-                            transitionSpec = {
-                                scaleIn(
-                                    animationSpec = androidx.compose.animation.core.spring(
-                                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                                        stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                        Text(
+                            text = attraction.category.emoji,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = attraction.category.displayName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    // Rating (like RN RatingBar)
+                    attraction.rating?.let { rating ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = Color(0xFFFFB300) // Gold
+                            )
+                            Text(
+                                text = String.format("%.1f", rating),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            // Show review count if available
+                            attraction.reviewsCount?.let { count ->
+                                if (count > 0) {
+                                    Text(
+                                        text = "($count)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                ) togetherWith scaleOut(
-                                    animationSpec = androidx.compose.animation.core.tween(150)
-                                )
-                            }
-                        ) { isFavorite ->
-                            Box(
-                                modifier = Modifier
-                                    .size(if (compactForFavorites) 36.dp else 32.dp)
-                                    .then(
-                                        if (!isFavorite) {
-                                            Modifier.background(
-                                                Color.Black.copy(alpha = 0.3f),
-                                                RoundedCornerShape(50)
-                                            )
-                                        } else {
-                                            Modifier
-                                        }
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    contentDescription = if (isFavorite) stringResource(R.string.cd_remove_from_favorites) else stringResource(
-                                        R.string.cd_add_to_favorites
-                                    ),
-                                    tint = if (isFavorite) Color(0xFF0C5329) else if (hasImage) getOverlayIconTint() else getContentIconTint(), // Зеленый цвет для избранного
-                                    modifier = Modifier.size(if (compactForFavorites) 26.dp else 24.dp)
-                                )
+                                }
                             }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Bottom content
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Тег над заголовком в компактном режиме
-                    if (compactForFavorites) {
-                        CategoryChip(
-                            category = attraction.category,
-                            modifier = Modifier.padding(bottom = 2.dp)
-                        )
-                    }
-                    
+                
+                // Description (like RN description)
+                if (showDescription && !compactForFavorites) {
                     Text(
-                        text = attraction.name,
-                        style = if (compactForFavorites) MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 18.sp,
-                            lineHeight = 22.sp // Уменьшенный line-height
-                        ) else MaterialTheme.typography.headlineSmall,
-                        color = if (hasImage) getOverlayTextColor() else getContentTextColor(),
+                        text = attraction.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        fontWeight = FontWeight.Bold
+                        lineHeight = 18.sp
                     )
-
-                    if (!compactForFavorites) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = attraction.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (hasImage) getOverlayTextColorWithAlpha(0.9f) else getSecondaryTextColor(),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
+                }
+                
+                // Address row (like RN addressRow)
+                attraction.location.address?.let { address ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 4.dp)
                     ) {
-                        // Location info
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = if (hasImage) getOverlayIconTint() else getContentIconTint(),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = (attraction.location.address?.let {
-                                    if (compactForFavorites) extractSettlement(it) else it
-                                }
-                                    ?: stringResource(R.string.detail_location)),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (hasImage) getOverlayTextColorWithAlpha(0.9f) else getSecondaryTextColor(),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                        }
-                    }
-
-                    // Distance if available
-                    if (showDistance && distance != null) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text(
-                            text = formatDistanceForCard(distance),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (hasImage) getOverlayTextColorWithAlpha(0.9f) else getSecondaryTextColor()
+                            text = if (compactForFavorites) extractSettlement(address) else address,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                     }
+                }
+                
+                // Distance if available
+                if (showDistance && distance != null) {
+                    Text(
+                        text = formatDistanceForCard(distance),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
             }
         }

@@ -1,5 +1,8 @@
 # ⚡ ВЫПОЛНИТЬ ОПТИМИЗАЦИЮ СЕЙЧАС
 
+> Note (2026-01-06): this optimization checklist was written for a period where `assets/attractions.json` could be treated as the primary dataset.
+> With offline-first **Supabase → Room** sync, treat JSON operations below as **optional** (only for the legacy fallback/seed file) and do not remove network dependencies required for sync.
+
 **Время**: 15-20 минут  
 **Экономия**: ~2.5-2.7 MB (30-40%)
 
@@ -34,14 +37,14 @@ cleanup_optimization.bat
 
 ---
 
-### 2️⃣ Минифицировать JSON (2 мин)
+### 2️⃣ Минифицировать JSON (опционально, legacy fallback) (2 мин)
 
 ```bash
 # Запустить:
 minify_json.bat
 
 # Проверить attractions_minified.json
-# Если OK, заменить:
+# Если OK и вы хотите оптимизировать именно legacy fallback файл, заменить:
 del app\src\main\assets\attractions.json
 ren app\src\main\assets\attractions_minified.json attractions.json
 ```

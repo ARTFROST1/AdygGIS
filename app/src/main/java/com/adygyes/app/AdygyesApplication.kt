@@ -7,6 +7,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import coil.util.DebugLogger
+import okhttp3.OkHttpClient
 import com.adygyes.app.data.local.locale.LocaleManager
 import com.vanniktech.emoji.EmojiManager
 import com.vanniktech.emoji.ios.IosEmojiProvider
@@ -192,7 +194,19 @@ class AdygyesApplication : Application(), ImageLoaderFactory {
      * Create Coil ImageLoader with custom configuration
      */
     override fun newImageLoader(): ImageLoader {
+        // Custom OkHttpClient with headers for external images (Yandex, etc.)
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("User-Agent", "AdygGIS Android App")
+                    .addHeader("Accept", "image/webp,image/png,image/jpeg,image/*,*/*")
+                    .build()
+                chain.proceed(request)
+            }
+            .build()
+
         return ImageLoader.Builder(this)
+            .okHttpClient(okHttpClient)
             .memoryCache {
                 MemoryCache.Builder(this)
                     .maxSizePercent(0.25)
@@ -205,6 +219,8 @@ class AdygyesApplication : Application(), ImageLoaderFactory {
                     .build()
             }
             .respectCacheHeaders(false)
+            .crossfade(true)
+            .logger(if (BuildConfig.DEBUG) DebugLogger() else null)
             .build()
     }
 }

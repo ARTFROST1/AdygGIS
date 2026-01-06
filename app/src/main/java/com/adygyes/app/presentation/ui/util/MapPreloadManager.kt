@@ -1,12 +1,11 @@
 package com.adygyes.app.presentation.ui.util
 
 import com.adygyes.app.data.local.cache.ImageCacheManager
+import com.adygyes.app.data.sync.SyncService
 import com.adygyes.app.domain.model.Attraction
 import com.adygyes.app.domain.repository.AttractionRepository
 import com.adygyes.app.presentation.ui.map.markers.VisualMarkerProvider
 import com.adygyes.app.presentation.ui.map.markers.VisualMarkerRegistry
-import com.yandex.mapkit.Animation
-import com.yandex.mapkit.map.CameraPosition
 import com.yandex.mapkit.mapview.MapView
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,12 +17,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Manages preloading of map data and markers in background while splash screen is shown
+ * Manages preloading of map data and markers in background while splash screen is shown.
+ * 
+ * OFFLINE-FIRST SUPABASE APPROACH:
+ * 1. Immediately read cached data from Room (instant)
+ * 2. Display UI with cached data
+ * 3. Background sync with Supabase (non-blocking)
+ * 4. Update UI when sync completes (if new data)
+ * 
+ * This ensures the app works offline and starts fast.
  */
 @Singleton
 class MapPreloadManager @Inject constructor(
     private val repository: AttractionRepository,
     private val imageCacheManager: ImageCacheManager,
+    private val syncService: SyncService,
     private val preferencesManager: com.adygyes.app.data.local.preferences.PreferencesManager
 ) {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -36,77 +44,27 @@ class MapPreloadManager @Inject constructor(
     
     private var preloadJob: Job? = null
     private var visualMarkerProvider: VisualMarkerProvider? = null
-    private var lastKnownDataVersion: String? = null
-    
-    init {
-        // Monitor data version changes and reset when needed
-        scope.launch {
-            preferencesManager.userPreferencesFlow.collect { preferences ->
-                val currentVersion = preferences.dataVersion
-                if (lastKnownDataVersion != null && lastKnownDataVersion != currentVersion) {
-                    Timber.d("🔄 Data version changed from '$lastKnownDataVersion' to '$currentVersion', starting data update process")
-                    
-                    // Show data updating overlay
-                    _preloadState.value = _preloadState.value.copy(
-                        dataUpdating = true,
-                        progress = 0.1f
-                    )
-                    
-                    // Small delay to show the overlay
-                    delay(500)
-                    
-                    // Update progress
-                    _preloadState.value = _preloadState.value.copy(progress = 0.3f)
-                    
-                    // Force reset all components
-                    forceReset()
-                    VisualMarkerRegistry.forceResetAll()
-                    
-                    // Update progress
-                    _preloadState.value = _preloadState.value.copy(progress = 0.7f)
-                    
-                    // Wait a bit more for cleanup to complete
-                    delay(1000)
-                    
-                    // Complete the update process
-                    _preloadState.value = _preloadState.value.copy(
-                        dataUpdating = false,
-                        progress = 1.0f
-                    )
-                    
-                    Timber.d("✅ Data update process completed")
-                    
-                    // CRITICAL: Restart preload process with new data after version update
-                    delay(500) // Small delay to ensure UI updates
-                    
-                    // Find the current MapView and restart preload
-                    val currentMapView = VisualMarkerRegistry.getCurrentMapView()
-                    if (currentMapView != null) {
-                        Timber.d("🔄 Restarting preload process with new data after version update")
-                        startPreload(currentMapView)
-                    } else {
-                        Timber.w("⚠️ No MapView available for restarting preload after version update")
-                    }
-                }
-                lastKnownDataVersion = currentVersion
-            }
-        }
-    }
     
     data class PreloadState(
         val isLoading: Boolean = false,
         val dataLoaded: Boolean = false,
         val markersCreated: Boolean = false,
         val imagesPreloaded: Boolean = false,
-        val allMarkersReady: Boolean = false,  // New field for fully loaded markers with images
-        val dataUpdating: Boolean = false,  // New field for data version update process
+        val allMarkersReady: Boolean = false,
+        val dataUpdating: Boolean = false,
+        val syncInProgress: Boolean = false,
         val error: String? = null,
-        val progress: Float = 0f  // 0.0 to 1.0
+        val progress: Float = 0f
     )
     
     /**
-     * Start preloading data and creating markers
-     * Call this as soon as MapView is created
+     * Start preloading data and creating markers.
+     * 
+     * OFFLINE-FIRST FLOW:
+     * 1. Read cached data from Room immediately (fast, works offline)
+     * 2. Create markers and show UI
+     * 3. Trigger background Supabase sync (non-blocking)
+     * 4. Update markers if sync brings new data
      */
     fun startPreload(mapView: MapView) {
         // Prevent multiple preload attempts
@@ -125,79 +83,189 @@ class MapPreloadManager @Inject constructor(
             return
         }
         
-        Timber.d("Starting preload with MapView: ${mapView.hashCode()}")
+        Timber.d("🚀 Starting OFFLINE-FIRST preload with MapView: ${mapView.hashCode()}")
         
         preloadJob = scope.launch {
             try {
                 _preloadState.value = PreloadState(isLoading = true, progress = 0.1f)
-                Timber.d("Starting map preload")
                 
-                // Step 1: Load attractions data (30% of progress)
-                val loadedAttractions = withContext(Dispatchers.IO) {
-                    repository.getAllAttractions().first() // Convert Flow to List
+                // ═══════════════════════════════════════════════════════════
+                // STEP 1: Load cached data from Room (INSTANT, works offline)
+                // ═══════════════════════════════════════════════════════════
+                val cachedAttractions = withContext(Dispatchers.IO) {
+                    repository.getAllAttractions().first()
                 }
-                _attractions.value = loadedAttractions
-                _preloadState.value = _preloadState.value.copy(
-                    dataLoaded = true, 
-                    progress = 0.3f
-                )
-                Timber.d("Loaded ${loadedAttractions.size} attractions")
                 
-                // Step 2: Preload visual markers (invisible) using VisualMarkerProvider
-                // This creates the native MapKit markers but keeps them invisible for later animation
-                withContext(Dispatchers.Main) {
-                    // Ensure we're on the main thread for MapKit operations
-                    visualMarkerProvider = VisualMarkerRegistry.getOrCreate(mapView, imageCacheManager)
+                Timber.d("📦 Loaded ${cachedAttractions.size} cached attractions from Room")
+                
+                // If we have cached data, proceed immediately
+                if (cachedAttractions.isNotEmpty()) {
+                    _attractions.value = cachedAttractions
+                    _preloadState.value = _preloadState.value.copy(
+                        dataLoaded = true,
+                        progress = 0.3f
+                    )
                     
-                    visualMarkerProvider?.let { provider ->
-                        // Preload all visual markers (invisible, ready for animation)
-                        provider.preloadMarkers(loadedAttractions)
-                        // Store the IDs so they won't be recreated later
-                        VisualMarkerRegistry.setLastIds(mapView, loadedAttractions.map { it.id }.toSet())
+                    // Create markers with cached data
+                    createMarkersForAttractions(mapView, cachedAttractions)
+                    
+                    // Mark as ready - user can proceed
+                    _preloadState.value = _preloadState.value.copy(
+                        allMarkersReady = true,
+                        isLoading = false,
+                        progress = 1.0f
+                    )
+                    Timber.d("✅ Preload complete with cached data")
+                    
+                    // Background sync (non-blocking)
+                    launchBackgroundSync(mapView)
+                    
+                } else {
+                    // ═══════════════════════════════════════════════════════════
+                    // NO CACHED DATA: Need to sync from Supabase first
+                    // ═══════════════════════════════════════════════════════════
+                    Timber.d("📡 No cached data, syncing from Supabase...")
+                    _preloadState.value = _preloadState.value.copy(
+                        syncInProgress = true,
+                        progress = 0.2f
+                    )
+                    
+                    // Perform sync
+                    val syncResult = withContext(Dispatchers.IO) {
+                        syncService.performSync()
+                    }
+                    
+                    _preloadState.value = _preloadState.value.copy(
+                        syncInProgress = false,
+                        progress = 0.5f
+                    )
+                    
+                    if (syncResult.success) {
+                        // Reload from Room after sync
+                        val freshAttractions = withContext(Dispatchers.IO) {
+                            repository.getAllAttractions().first()
+                        }
                         
-                        Timber.d("✅ Preloaded ${loadedAttractions.size} invisible markers on MapView: ${mapView.hashCode()}")
+                        Timber.d("📦 Synced and loaded ${freshAttractions.size} attractions")
+                        
+                        if (freshAttractions.isNotEmpty()) {
+                            _attractions.value = freshAttractions
+                            _preloadState.value = _preloadState.value.copy(
+                                dataLoaded = true,
+                                progress = 0.7f
+                            )
+                            
+                            createMarkersForAttractions(mapView, freshAttractions)
+                            
+                            _preloadState.value = _preloadState.value.copy(
+                                allMarkersReady = true,
+                                isLoading = false,
+                                progress = 1.0f
+                            )
+                            Timber.d("✅ Preload complete after Supabase sync")
+                        } else {
+                            // Sync succeeded but no data - show empty state
+                            _preloadState.value = _preloadState.value.copy(
+                                dataLoaded = true,
+                                allMarkersReady = true,
+                                isLoading = false,
+                                progress = 1.0f
+                            )
+                            Timber.w("⚠️ Sync successful but no attractions found")
+                        }
+                    } else {
+                        // Sync failed - allow user to proceed anyway
+                        Timber.e("❌ Supabase sync failed: ${syncResult.errorMessage}")
+                        _preloadState.value = _preloadState.value.copy(
+                            allMarkersReady = true, // Allow proceed
+                            isLoading = false,
+                            error = syncResult.errorMessage,
+                            progress = 1.0f
+                        )
                     }
                 }
-                
-                _preloadState.value = _preloadState.value.copy(
-                    markersCreated = true,
-                    progress = 0.5f
-                )
-                Timber.d("Visual markers creation completed")
-                
-                // Step 3: Preload images in cache AND wait for markers to load them
-                val imageUrls: List<String> = loadedAttractions.mapNotNull { attraction -> 
-                    attraction.images.firstOrNull() // Get first image URL from List<String>
-                }
-                if (imageUrls.isNotEmpty()) {
-                    withContext(Dispatchers.IO) {
-                        imageCacheManager.preloadImages(imageUrls)
-                    }
-                    Timber.d("Preloaded ${imageUrls.size} images")
-                }
-                
-                _preloadState.value = _preloadState.value.copy(
-                    imagesPreloaded = true,
-                    progress = 0.8f
-                )
-                
-                // Step 4: Wait for marker creation and image preloading to complete
-                // Images are now preloaded during marker creation, so less wait time needed
-                delay(500) // Reduced wait time since images are preloaded
-                
-                _preloadState.value = _preloadState.value.copy(
-                    allMarkersReady = true,
-                    isLoading = false,
-                    progress = 1.0f
-                )
-                Timber.d("Map preload completed successfully with all markers and images ready")
                 
             } catch (e: Exception) {
                 Timber.e(e, "Error during map preload")
+                // On any error, allow user to proceed
                 _preloadState.value = PreloadState(
                     isLoading = false,
+                    allMarkersReady = true, // Don't block user
                     error = e.message
                 )
+            }
+        }
+    }
+    
+    /**
+     * Create visual markers for attractions (runs on Main thread)
+     */
+    private suspend fun createMarkersForAttractions(mapView: MapView, attractions: List<Attraction>) {
+        withContext(Dispatchers.Main) {
+            visualMarkerProvider = VisualMarkerRegistry.getOrCreate(mapView, imageCacheManager)
+            
+            visualMarkerProvider?.let { provider ->
+                provider.preloadMarkers(attractions)
+                VisualMarkerRegistry.setLastIds(mapView, attractions.map { it.id }.toSet())
+                Timber.d("✅ Created ${attractions.size} markers on MapView: ${mapView.hashCode()}")
+            }
+        }
+        
+        _preloadState.value = _preloadState.value.copy(
+            markersCreated = true,
+            progress = 0.6f
+        )
+        
+        // Preload images in background
+        val imageUrls = attractions.mapNotNull { it.images.firstOrNull() }
+        if (imageUrls.isNotEmpty()) {
+            withContext(Dispatchers.IO) {
+                imageCacheManager.preloadImages(imageUrls)
+            }
+            Timber.d("📷 Preloaded ${imageUrls.size} images")
+        }
+        
+        _preloadState.value = _preloadState.value.copy(
+            imagesPreloaded = true,
+            progress = 0.9f
+        )
+    }
+    
+    /**
+     * Launch background sync with Supabase (non-blocking)
+     */
+    private fun launchBackgroundSync(mapView: MapView) {
+        scope.launch {
+            try {
+                Timber.d("🔄 Starting background Supabase sync...")
+                _preloadState.value = _preloadState.value.copy(syncInProgress = true)
+                
+                val syncResult = withContext(Dispatchers.IO) {
+                    syncService.performSync()
+                }
+                
+                _preloadState.value = _preloadState.value.copy(syncInProgress = false)
+                
+                if (syncResult.success && (syncResult.added > 0 || syncResult.updated > 0 || syncResult.deleted > 0)) {
+                    Timber.d("📡 Background sync found changes: +${syncResult.added} ~${syncResult.updated} -${syncResult.deleted}")
+                    
+                    // Reload and update markers
+                    val freshAttractions = withContext(Dispatchers.IO) {
+                        repository.getAllAttractions().first()
+                    }
+                    
+                    if (freshAttractions != _attractions.value) {
+                        _attractions.value = freshAttractions
+                        createMarkersForAttractions(mapView, freshAttractions)
+                        Timber.d("✅ Markers updated with new data")
+                    }
+                } else {
+                    Timber.d("📡 Background sync: no changes")
+                }
+                
+            } catch (e: Exception) {
+                Timber.e(e, "Background sync failed")
+                _preloadState.value = _preloadState.value.copy(syncInProgress = false)
             }
         }
     }
@@ -214,26 +282,28 @@ class MapPreloadManager @Inject constructor(
     }
     
     /**
-     * Force reset when data version changes
+     * Force reset and reload data (e.g., after manual refresh)
      */
     fun forceReset() {
-        Timber.d("🔄 Force resetting MapPreloadManager due to data version change")
-        
-        // Cancel any active preload job
+        Timber.d("🔄 Force resetting MapPreloadManager")
         preloadJob?.cancel()
-        
-        // Reset state but preserve dataUpdating status
-        val currentState = _preloadState.value
-        _preloadState.value = PreloadState(
-            dataUpdating = currentState.dataUpdating,
-            progress = currentState.progress
-        )
+        _preloadState.value = PreloadState()
         _attractions.value = emptyList()
-        
-        // Clear visual marker provider reference
         visualMarkerProvider = null
-        
+        VisualMarkerRegistry.forceResetAll()
         Timber.d("✅ MapPreloadManager force reset completed")
+    }
+    
+    /**
+     * Trigger manual sync with Supabase
+     */
+    fun triggerSync(mapView: MapView? = null) {
+        val targetMapView = mapView ?: VisualMarkerRegistry.getCurrentMapView()
+        if (targetMapView != null) {
+            launchBackgroundSync(targetMapView)
+        } else {
+            Timber.w("⚠️ No MapView available for sync")
+        }
     }
     
     /**

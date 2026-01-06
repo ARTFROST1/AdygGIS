@@ -53,6 +53,10 @@ android {
         // Add API keys to BuildConfig
         buildConfigField("String", "YANDEX_MAPKIT_API_KEY", "\"${localProperties.getProperty("YANDEX_MAPKIT_API_KEY", "YOUR_API_KEY_HERE")}\"")
         
+        // Supabase Configuration
+        buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL", "")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\"")
+        
         // Room schema export
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
@@ -189,6 +193,12 @@ dependencies {
     
     // Serialization
     implementation(libs.kotlinx.serialization.json)
+    
+    // Networking - Retrofit + OkHttp for Supabase
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.kotlinx.serialization)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
     
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

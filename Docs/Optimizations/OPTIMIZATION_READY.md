@@ -5,17 +5,16 @@
 **Время выполнения**: 15-20 минут  
 **Ожидаемая экономия**: ~2.5-2.7 MB (30-40%)
 
+> Note (2026-01-06): this plan assumes a JSON-only data source. With offline-first Supabase sync enabled, **Retrofit/OkHttp are required** and must not be removed. JSON minification is optional (fallback/seed only).
+
 ---
 
 ## 📦 ЧТО УЖЕ СДЕЛАНО
 
 ### ✅ Код оптимизирован:
-1. **app/build.gradle.kts** - удалено 8 зависимостей (~1.7 MB)
-   - Retrofit core + kotlinx.serialization
-   - OkHttp + OkHttp logging
-   - Accompanist Pager
-   - Coil SVG
-   - Google Fonts
+1. **app/build.gradle.kts** - удаление зависимостей нужно пересмотреть под текущую архитектуру
+   - **НЕ УДАЛЯТЬ** Retrofit/OkHttp при Supabase sync
+   - Accompanist Pager / Coil SVG / Google Fonts можно удалять только если реально не используются
 
 2. **app/proguard-rules.pro** - агрессивные оптимизации (~1-2 MB)
    - 5 проходов оптимизации

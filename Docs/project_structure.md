@@ -1,7 +1,7 @@
 # Project Structure Guide
 
-**Last Updated:** 2025-10-05  
-**Current Version:** ПРОЕКТ ЗАВЕРШЕН! All Stages Complete (100%) 🎉
+**Last Updated:** 2026-01-06  
+**Current Version:** Offline-first Supabase sync integrated
 
 > Branding: User-facing app name is "AdygGIS". Internal code/package retains "Adygyes" to avoid breaking changes.
 
@@ -17,13 +17,16 @@
 - **✅ Единый интерфейс:** Интегрированная навигация с переключением Карта/Список
 - **✅ Полная интеграция избранного:** CategoryCarousel + переключение Список/Плитки + Сортировка в MapScreen
 - **✅ Умное центрирование карты:** Автоматическое позиционирование результатов поиска в верхней части экрана с учетом панели
-- **✅ Продвинутое кэширование:** ImageCacheManager с автоматической инвалидацией кэша при изменении версии данных
-- **✅ Упрощенное управление данными:** JsonFileManager читает только из assets/attractions.json
+- **✅ Продвинутое кэширование:** ImageCacheManager (предзагрузка изображений для маркеров)
+- **✅ Offline-first данные:** Supabase → Room cache (delta sync по `updated_at`), UI всегда читает из Room
+- **✅ Legacy JSON режим:** `assets/attractions.json` используется только если Supabase не сконфигурирован (или как seed)
 - **✅ Полная локализация:** 100% русский интерфейс + архитектура для английского
 - **✅ Исправления совместимости:** Решены проблемы Canvas с hardware bitmap для маркеров карты
 - **✅ Готов к публикации:** Все этапы завершены, приложение готово к Google Play Store
 
 ## Project Directory Layout
+
+> Note: The tree below is a high-level map. The source of truth is the actual packages under `app/src/main/java`.
 
 ```
 AdyhyesKOTLIN/
@@ -31,7 +34,7 @@ AdyhyesKOTLIN/
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── assets/                    # Static data files
-│   │   │   │   ├── attractions.json      # 10 real Adygea attractions
+│   │   │   │   ├── attractions.json      # Legacy fallback/seed data
 │   │   │   │   └── geo_objects.json      # Geographic objects data
 │   │   │   ├── java/com/adygyes/app/
 │   │   │   │   ├── data/                 # Data layer
@@ -49,8 +52,8 @@ AdyhyesKOTLIN/
 │   │   │   │   │   │   │   └── LocaleManager.kt
 │   │   │   │   │   │   ├── preferences/  # DataStore preferences
 │   │   │   │   │   │   │   └── PreferencesManager.kt
-│   │   │   │   │   │   └── JsonFileManager.kt  # Simplified JSON reader
-│   │   │   │   │   ├── remote/           # Remote data sources
+│   │   │   │   │   │   └── JsonFileManager.kt  # Legacy JSON reader (fallback/seed)
+│   │   │   │   │   ├── remote/           # Supabase REST (Retrofit)
 │   │   │   │   │   │   └── dto/          # Data transfer objects
 │   │   │   │   │   │       └── AttractionDto.kt
 │   │   │   │   │   ├── repository/       # Repository implementations
@@ -199,6 +202,17 @@ AdyhyesKOTLIN/
 └── README.md                     # Project overview
 ```
 
+### Supabase sync (source of truth)
+
+The directory tree above is intentionally high-level. Current offline-first data flow is implemented in these packages:
+
+- `data/remote/api/SupabaseApiService.kt` (PostgREST endpoints)
+- `data/remote/config/SupabaseConfig.kt` (URL + API key)
+- `data/remote/dto/AttractionDto.kt`, `data/remote/dto/SyncMetadataDto.kt`
+- `data/remote/SupabaseRemoteDataSource.kt`
+- `data/sync/SyncService.kt` (delta sync using `updated_at` + tombstones)
+- `data/sync/SyncManager.kt`, `data/sync/NetworkMonitor.kt`
+
 ## Key Architecture Patterns
 
 ### 🏗️ **Clean Architecture Implementation**
@@ -212,7 +226,7 @@ AdyhyesKOTLIN/
 - **✅ UI/UX Review**: Комплексный обзор всех экранов и взаимодействий
 - **✅ Оптимизация производительности**: Улучшения производительности карты и использования памяти
 - **✅ Продвинутое кэширование изображений**: ImageCacheManager с Coil интеграцией
-- **✅ Система версионирования данных**: Автоматическое обновление при изменении attractions.json
+- **✅ Offline-first sync**: Supabase → Room cache, UI reads Room (JSON only as fallback/seed)
 - **✅ Dual-Layer маркеры**: 100% надежность кликов с нативными визуальными маркерами
 - **✅ Премиум анимации**: 12-кадровая система анимации с предзагруженными изображениями
 - **✅ Полная локализация**: Русский интерфейс + архитектура для мультиязычности
@@ -258,9 +272,9 @@ AdyhyesKOTLIN/
 #### 💾 **Data Management:**
 - **Room Database** - Local persistence with migrations support
 - **DataStore Preferences** - User settings and preferences
-- **JSON Assets** - 10+ real Adygea attractions with full details
-- **Image Caching** - Coil-based caching with version invalidation
-- **Data Versioning** - Automatic updates when JSON version changes
+- **JSON Assets** - Legacy fallback/seed data (not the primary source)
+- **Image Caching** - Coil-based caching (JSON-version invalidation is fallback-only)
+- **Data Sync** - Supabase delta sync updates Room via `updated_at`
 - **Offline Support** - Full offline functionality
 - **Repository Pattern** - Clean separation of data sources
 
@@ -307,8 +321,8 @@ AdyhyesKOTLIN/
 
 ### ✅ **Data Architecture Simplification:**
 - Removed Developer Mode completely
-- Simplified to single JSON data source (assets/attractions.json)
-- Implemented automatic data versioning system
+- Offline-first data flow: Supabase → Room cache → UI
+- `assets/attractions.json` retained only as legacy fallback/seed
 - Added comprehensive image caching with Coil
 
 ## Architecture Pattern: MVVM + Clean Architecture
@@ -438,7 +452,7 @@ The app now features a sophisticated image caching system that optimizes perform
 #### Key Features:
 - **Smart Preloading**: First image of each attraction preloaded on app start
 - **Lazy Loading**: Additional gallery images loaded on-demand
-- **Version Sync**: Cache automatically cleared when attractions.json version changes
+- **Legacy JSON Version Sync**: Cache cleared when attractions.json version changes (fallback/seed only)
 - **Hardware Bitmap Fix**: Resolved Canvas compatibility for map markers with `.allowHardware(false)`
 
 #### Integration Points:

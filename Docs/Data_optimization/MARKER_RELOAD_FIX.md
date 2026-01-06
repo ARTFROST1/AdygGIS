@@ -1,5 +1,8 @@
 # Исправление проблемы с отсутствием маркеров после обновления версии JSON
 
+> Status (2026-01-06): this scenario is specific to the **legacy JSON version update** flow.
+> In the current offline-first architecture, marker updates should be driven by Room updates produced by Supabase sync.
+
 ## Проблема
 
 После обновления версии файла `attractions.json` маркеры не появлялись на карте до перехода в режим списка. Это происходило из-за того, что:

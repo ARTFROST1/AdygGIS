@@ -9,6 +9,11 @@ import com.adygyes.app.domain.model.Location
 
 /**
  * Mapper for converting between domain models and data entities
+ * 
+ * Handles conversions:
+ * - AttractionDto (Supabase) ↔ AttractionEntity (Room)
+ * - AttractionEntity (Room) ↔ Attraction (Domain)
+ * - AttractionDto (Supabase) → Attraction (Domain)
  */
 object AttractionMapper {
     
@@ -20,7 +25,11 @@ object AttractionMapper {
             id = id,
             name = name,
             description = description,
-            category = AttractionCategory.valueOf(category),
+            category = try {
+                AttractionCategory.valueOf(category)
+            } catch (e: IllegalArgumentException) {
+                AttractionCategory.NATURE
+            },
             location = Location(
                 latitude = latitude,
                 longitude = longitude,
@@ -40,7 +49,13 @@ object AttractionMapper {
             isFavorite = isFavorite,
             tags = tags,
             priceInfo = priceInfo,
-            amenities = amenities
+            amenities = amenities,
+            // Extended fields
+            reviewsCount = reviewsCount,
+            averageRating = averageRating,
+            operatingSeason = operatingSeason,
+            duration = duration,
+            bestTimeToVisit = bestTimeToVisit
         )
     }
     
@@ -66,7 +81,13 @@ object AttractionMapper {
             isFavorite = isFavorite,
             tags = tags,
             priceInfo = priceInfo,
-            amenities = amenities
+            amenities = amenities,
+            // Extended fields
+            reviewsCount = reviewsCount,
+            averageRating = averageRating,
+            operatingSeason = operatingSeason,
+            duration = duration,
+            bestTimeToVisit = bestTimeToVisit
         )
     }
     
@@ -113,15 +134,24 @@ object AttractionMapper {
                     website = website
                 )
             } else null,
-            isFavorite = isFavorite,
+            isFavorite = false, // isFavorite is local-only, not from API
             tags = tags,
             priceInfo = priceInfo,
-            amenities = amenities
+            amenities = amenities,
+            // Extended fields
+            reviewsCount = reviewsCount,
+            averageRating = averageRating,
+            operatingSeason = operatingSeason,
+            duration = duration,
+            bestTimeToVisit = bestTimeToVisit
         )
     }
     
     /**
      * Convert AttractionDto to AttractionEntity
+     * 
+     * Note: isFavorite defaults to false since it's a local-only field.
+     * The sync service should preserve existing favorite status when updating.
      */
     fun AttractionDto.toEntity(): AttractionEntity {
         return AttractionEntity(
@@ -139,10 +169,21 @@ object AttractionMapper {
             phoneNumber = phoneNumber,
             email = email,
             website = website,
-            isFavorite = isFavorite,
+            isFavorite = false, // Local-only, not from API
             tags = tags,
             priceInfo = priceInfo,
-            amenities = amenities
+            amenities = amenities,
+            // Extended fields
+            reviewsCount = reviewsCount,
+            averageRating = averageRating,
+            operatingSeason = operatingSeason,
+            duration = duration,
+            bestTimeToVisit = bestTimeToVisit,
+            // Supabase metadata
+            isPublished = isPublished,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            lastSyncedAt = System.currentTimeMillis()
         )
     }
     

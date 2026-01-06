@@ -10,6 +10,7 @@ import com.adygyes.app.data.mapper.AttractionMapper.toEntitiesFromDto
 import com.adygyes.app.data.mapper.AttractionMapper.toEntity
 import com.adygyes.app.data.remote.dto.AttractionDto
 import com.adygyes.app.data.remote.dto.AttractionsResponse
+import com.adygyes.app.data.remote.config.SupabaseConfig
 import com.adygyes.app.domain.model.Attraction
 import com.adygyes.app.domain.model.AttractionCategory
 import com.adygyes.app.domain.repository.AttractionRepository
@@ -69,6 +70,14 @@ class AttractionRepositoryImpl @Inject constructor(
     }
     
     override suspend fun loadInitialData() {
+        // IMPORTANT:
+        // When Supabase is configured, attractions are synced from Supabase into Room.
+        // Loading from bundled JSON can overwrite server truth and create drift.
+        if (SupabaseConfig.isConfigured()) {
+            Timber.d("ℹ️ Supabase configured: skipping assets JSON initial load")
+            return
+        }
+
         try {
             Timber.d("🔄 Starting loadInitialData() - checking version...")
             
@@ -336,7 +345,7 @@ class AttractionRepositoryImpl @Inject constructor(
     override suspend fun deleteAttraction(attractionId: String): Boolean {
         return try {
             // Delete from database only - no JSON editing in simplified mode
-            attractionDao.deleteAttraction(attractionId)
+            attractionDao.deleteAttractionById(attractionId)
             
             Timber.d("✅ Deleted attraction: $attractionId")
             true
@@ -387,14 +396,18 @@ class AttractionRepositoryImpl @Inject constructor(
             directions = location.directions,
             images = images,
             rating = rating,
+            reviewsCount = reviewsCount,
+            averageRating = averageRating,
             workingHours = workingHours,
             phoneNumber = contactInfo?.phone,
             email = contactInfo?.email,
             website = contactInfo?.website,
-            isFavorite = isFavorite,
             tags = tags,
             priceInfo = priceInfo,
-            amenities = amenities
+            amenities = amenities,
+            operatingSeason = operatingSeason,
+            duration = duration,
+            bestTimeToVisit = bestTimeToVisit
         )
     }
     

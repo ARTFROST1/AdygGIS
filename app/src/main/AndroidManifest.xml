@@ -30,6 +30,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Adygyes"
         android:enableOnBackInvokedCallback="true"
+        android:usesCleartextTraffic="true"
         tools:targetApi="31">
         <activity
             android:name="com.adygyes.app.MainActivity"

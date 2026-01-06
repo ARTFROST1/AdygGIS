@@ -1,16 +1,19 @@
 # Этап 3: Удаление неиспользуемых зависимостей
 
+> Status (2026-01-06): this step is **outdated** for the current offline-first Supabase sync architecture.
+> Do **NOT** remove Retrofit/OkHttp while Supabase sync is enabled.
+
 ## ❌ УДАЛИТЬ из app/build.gradle.kts:
 
-### 1. Сетевые библиотеки (строки 167-171) - НЕ ИСПОЛЬЗУЮТСЯ
+### 1. Сетевые библиотеки (Retrofit/OkHttp) - ❌ НЕ УДАЛЯТЬ при Supabase sync
 ```kotlin
-// УДАЛИТЬ:
+// НЕ УДАЛЯТЬ при Supabase sync:
 implementation(libs.retrofit.core)                    // ~450 KB
 implementation(libs.retrofit.kotlinx.serialization)   // ~100 KB
 implementation(libs.okhttp)                           // ~800 KB
 implementation(libs.okhttp.logging)                   // ~50 KB
 ```
-**Экономия: ~1.4 MB** ⭐ Крупнейшая находка!
+**Примечание**: удалить можно только если проект полностью отказался от сетевых запросов.
 
 ### 2. Google Fonts (строка 152) - НЕ ИСПОЛЬЗУЮТСЯ
 ```kotlin
@@ -39,8 +42,8 @@ implementation(libs.coil.svg)                         // ~150 KB
 implementation(libs.accompanist.permissions)          // MapScreen
 implementation(libs.accompanist.systemuicontroller)   // System bars
 
-// ✅ Serialization (используется для JSON)
-implementation(libs.kotlinx.serialization.json)       // attractions.json
+// ⚠️ Serialization (нужна только для legacy JSON fallback/seed)
+implementation(libs.kotlinx.serialization.json)       // attractions.json (fallback)
 
 // ✅ Coil (загрузка изображений)
 implementation(libs.coil.compose)                     // Основной Coil
@@ -56,7 +59,7 @@ implementation(libs.compose.zoomable)                 // Зум фото
 3. Удалить строки:
    - 152 (Google Fonts)
    - 157 (Accompanist Pager)
-   - 167-171 (Retrofit + OkHttp, 5 строк)
+   - 167-171 (Retrofit + OkHttp, 5 строк) **только если нет Supabase sync**
    - 182 (Coil SVG)
 4. Сохранить файл
 5. Sync Gradle

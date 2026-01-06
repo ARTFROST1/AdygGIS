@@ -71,6 +71,11 @@
     <string name="detail_route">Маршрут</string>
     <string name="detail_details">Подробнее</string>
     <string name="detail_address">Адрес</string>
+    <string name="detail_phone">Телефон</string>
+    <string name="detail_website">Сайт</string>
+    <string name="detail_duration">Продолжительность</string>
+    <string name="detail_best_time">Лучшее время</string>
+    <string name="detail_operating_season">Сезон работы</string>
     
     <!-- Content Descriptions -->
     <string name="cd_back">Назад</string>

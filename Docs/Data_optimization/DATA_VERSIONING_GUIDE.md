@@ -1,5 +1,8 @@
 # Руководство по версионированию данных в Adygyes
 
+> Status (2026-01-06): this guide applies to the **legacy JSON fallback/seed** flow.
+> In the current architecture, the primary data source is **Supabase → Room cache** (offline-first sync), so data freshness is driven by sync, not by `attractions.json` versioning.
+
 ## Проблема
 При изменении файла `app/src/main/assets/attractions.json` изменения не вступали в силу при повторной сборке приложения. Приложение продолжало использовать кэшированные данные из локальной базы данных Room.
 

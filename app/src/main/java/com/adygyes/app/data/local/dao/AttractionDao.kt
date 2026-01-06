@@ -22,6 +22,12 @@ interface AttractionDao {
     @Query("SELECT * FROM attractions WHERE isFavorite = 1")
     fun getFavoriteAttractions(): Flow<List<AttractionEntity>>
     
+    /**
+     * Get list of favorite attraction IDs (for preserving during sync)
+     */
+    @Query("SELECT id FROM attractions WHERE isFavorite = 1")
+    suspend fun getFavoriteIds(): List<String>
+    
     @Query("SELECT * FROM attractions WHERE name LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%'")
     fun searchAttractions(query: String): Flow<List<AttractionEntity>>
     
@@ -40,8 +46,11 @@ interface AttractionDao {
     @Delete
     suspend fun deleteAttraction(attraction: AttractionEntity)
     
+    /**
+     * Delete attraction by ID (used by sync for tombstones)
+     */
     @Query("DELETE FROM attractions WHERE id = :attractionId")
-    suspend fun deleteAttraction(attractionId: String)
+    suspend fun deleteAttractionById(attractionId: String)
     
     @Query("DELETE FROM attractions")
     suspend fun deleteAllAttractions()
@@ -51,4 +60,11 @@ interface AttractionDao {
     
     @Query("SELECT COUNT(*) FROM attractions")
     suspend fun getAttractionsCount(): Int
+    
+    /**
+     * Get attractions updated after a specific timestamp
+     * Used for checking local data freshness
+     */
+    @Query("SELECT * FROM attractions WHERE lastSyncedAt > :timestamp")
+    suspend fun getAttractionsSyncedAfter(timestamp: Long): List<AttractionEntity>
 }

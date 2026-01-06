@@ -1,27 +1,52 @@
 package com.adygyes.app.presentation.ui.components
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.adygyes.app.R
 import com.adygyes.app.domain.model.Attraction
+import com.adygyes.app.domain.model.ReviewSortOption
 import com.adygyes.app.presentation.theme.Dimensions
+import com.adygyes.app.presentation.ui.components.reviews.ReviewSection
+import com.adygyes.app.presentation.ui.components.reviews.WriteReviewModal
+import com.adygyes.app.presentation.viewmodel.ReviewViewModel
 import kotlinx.coroutines.launch
 
 /**
- * Bottom sheet for displaying attraction details on the map
+ * Bottom sheet for displaying attraction details on the map.
+ * Unified with RN UnifiedAttractionSheet component.
+ * 
+ * Structure:
+ * - Photo gallery (PhotoGallery component)
+ * - Header: title + category chip + rating + favorite button
+ * - Action buttons: route + share
+ * - Description (3 lines preview)
+ * - Info section: address, working hours, price, phone, website, duration, bestTime
+ * - Reviews section (like RN)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,12 +58,35 @@ fun AttractionBottomSheet(
     onToggleFavorite: () -> Unit,
     onShare: () -> Unit,
     modifier: Modifier = Modifier,
-    distance: Float? = null
+    distance: Float? = null,
+    reviewViewModel: ReviewViewModel = hiltViewModel()
 ) {
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = false
     )
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var showWriteReviewModal by remember { mutableStateOf(false) }
+    
+    // Load reviews when attraction changes
+    LaunchedEffect(attraction.id) {
+        reviewViewModel.loadReviews(attraction.id)
+    }
+    
+    val reviews by reviewViewModel.reviews.collectAsState()
+    val sortBy by reviewViewModel.sortBy.collectAsState()
+    val loading by reviewViewModel.loading.collectAsState()
+    val submitting by reviewViewModel.submitting.collectAsState()
+    val errorMessage by reviewViewModel.error.collectAsState()
+    val submitSuccess by reviewViewModel.submitSuccess.collectAsState()
+    
+    // Close modal on successful submit
+    LaunchedEffect(submitSuccess) {
+        if (submitSuccess) {
+            showWriteReviewModal = false
+            reviewViewModel.resetSubmitSuccess()
+        }
+    }
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -52,24 +100,22 @@ fun AttractionBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = Dimensions.PaddingLarge)
                 .padding(bottom = Dimensions.PaddingLarge)
         ) {
-            // Image gallery
+            // Photo gallery
             PhotoGallery(
                 images = attraction.images,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
+                    .height(250.dp)
+                    .padding(horizontal = Dimensions.PaddingLarge),
                 onImageClick = { 
-                    // Close bottom sheet immediately and navigate
                     scope.launch {
                         sheetState.hide()
                         onNavigateToDetail()
                     }
                 },
                 onFullscreenClick = {
-                    // Close bottom sheet immediately and navigate
                     scope.launch {
                         sheetState.hide()
                         onNavigateToDetail()
@@ -77,184 +123,127 @@ fun AttractionBottomSheet(
                 }
             )
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             
-            // Title and category
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+            // Header section
+            Column(
+                modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                // Title row with favorite button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
                     Text(
                         text = attraction.name,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
                     
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            imageVector = if (attraction.isFavorite) 
+                                Icons.Default.Favorite 
+                            else 
+                                Icons.Default.FavoriteBorder,
+                            contentDescription = if (attraction.isFavorite) 
+                                stringResource(R.string.cd_remove_from_favorites) 
+                            else 
+                                stringResource(R.string.cd_add_to_favorites),
+                            tint = if (attraction.isFavorite) 
+                                Color(0xFFE53935) // Red for favorite
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 
-                // Favorite button (top right)
-                IconButton(
-                    onClick = onToggleFavorite
-                ) {
-                    Icon(
-                        imageVector = if (attraction.isFavorite) 
-                            Icons.Default.Favorite 
-                        else 
-                            Icons.Default.FavoriteBorder,
-                        contentDescription = if (attraction.isFavorite) 
-                            stringResource(R.string.cd_remove_from_favorites) 
-                        else 
-                            stringResource(R.string.cd_add_to_favorites),
-                        tint = if (attraction.isFavorite) 
-                            MaterialTheme.colorScheme.primary 
-                        else 
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Category, rating and share button row (full width)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Category chip on the left
-                CategoryChip(
-                    category = attraction.category,
-                    compact = true
-                )
+                Spacer(modifier = Modifier.height(8.dp))
                 
-                // Rating in the center
-                attraction.rating?.let { rating ->
-                    RatingBar(
-                        rating = rating,
-                        size = 16.dp
-                    )
-                }
-                
-                // Share button on the right (same size as favorite)
-                IconButton(
-                    onClick = onShare
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = stringResource(R.string.detail_share),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            
-            // Distance info
-            distance?.let { dist ->
+                // Meta row: category chip + rating + review count
                 Row(
-                    modifier = Modifier.padding(vertical = Dimensions.SpacingSmall),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurface
+                    CategoryChip(
+                        category = attraction.category,
+                        size = ChipSize.MEDIUM,
+                        showEmoji = true,
+                        showLabel = true
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = formatDistance(dist),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    
+                    // Rating with review count
+                    attraction.rating?.let { rating ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color(0xFFFFB300) // Gold
+                            )
+                            Text(
+                                text = String.format("%.1f", rating),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            attraction.reviewsCount?.let { count ->
+                                Text(
+                                    text = "($count)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Distance
+                distance?.let { dist ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Navigation,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = formatDistance(dist),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
             
-            HorizontalDivider(modifier = Modifier.padding(vertical = Dimensions.SpacingMedium))
-            
-            // Description
-            Text(
-                text = attraction.description,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(bottom = Dimensions.SpacingMedium)
-            )
-            
-            // Info items
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                attraction.workingHours?.let { hours ->
-                    InfoCard(
-                        icon = Icons.Default.Schedule,
-                        title = stringResource(R.string.detail_working_hours),
-                        content = {
-                            Text(
-                                text = hours,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    )
-                }
-                
-                attraction.priceInfo?.let { price ->
-                    InfoCard(
-                        icon = Icons.Default.AttachMoney,
-                        title = stringResource(R.string.detail_price),
-                        content = {
-                            Text(
-                                text = price,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    )
-                }
-                
-                attraction.location.address?.let { address ->
-                    InfoCard(
-                        icon = Icons.Default.Place,
-                        title = stringResource(R.string.detail_address),
-                        content = {
-                            Text(
-                                text = address,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    )
-                }
-                
-                // Контактная информация
-                attraction.contactInfo?.let { contactInfo ->
-                    InfoCard(
-                        icon = Icons.Default.ContactPhone,
-                        title = stringResource(R.string.detail_contact_info),
-                        content = {
-                            ClickableContactInfo(
-                                contactInfo = contactInfo,
-                                compact = true
-                            )
-                        }
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(Dimensions.SpacingMedium))
+            Spacer(modifier = Modifier.height(16.dp))
             
             // Action buttons
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Dimensions.SpacingSmall)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimensions.PaddingLarge),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Build route button
+                // Route button (primary)
                 Button(
                     onClick = onBuildRoute,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Directions,
@@ -265,70 +254,271 @@ fun AttractionBottomSheet(
                     Text(stringResource(R.string.detail_route))
                 }
                 
-                // Details button
+                // Share button (outlined)
                 OutlinedButton(
-                    onClick = onNavigateToDetail,
+                    onClick = onShare,
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Info,
+                        imageVector = Icons.Default.Share,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.detail_details))
+                    Text(stringResource(R.string.detail_share))
                 }
             }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Description
+            Text(
+                text = attraction.description,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge)
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Info section (unified with RN AttractionInfo)
+            Column(
+                modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                // Address (clickable)
+                attraction.location.address?.let { address ->
+                    InfoRow(
+                        icon = Icons.Outlined.LocationOn,
+                        label = stringResource(R.string.detail_address),
+                        value = address,
+                        showChevron = true,
+                        onClick = {
+                            val uri = Uri.parse("geo:${attraction.location.latitude},${attraction.location.longitude}?q=${Uri.encode(address)}")
+                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        }
+                    )
+                }
+                
+                // Working hours
+                attraction.workingHours?.let { hours ->
+                    InfoRow(
+                        icon = Icons.Outlined.Schedule,
+                        label = stringResource(R.string.detail_working_hours),
+                        value = hours
+                    )
+                }
+                
+                // Price
+                attraction.priceInfo?.let { price ->
+                    InfoRow(
+                        icon = Icons.Outlined.Payments,
+                        label = stringResource(R.string.detail_price),
+                        value = price
+                    )
+                }
+                
+                // Phone (clickable)
+                attraction.contactInfo?.phone?.let { phone ->
+                    InfoRow(
+                        icon = Icons.Outlined.Phone,
+                        label = stringResource(R.string.detail_phone),
+                        value = phone,
+                        showChevron = true,
+                        onClick = {
+                            val uri = Uri.parse("tel:$phone")
+                            context.startActivity(Intent(Intent.ACTION_DIAL, uri))
+                        }
+                    )
+                }
+                
+                // Website (clickable)
+                attraction.contactInfo?.website?.let { website ->
+                    InfoRow(
+                        icon = Icons.Outlined.Language,
+                        label = stringResource(R.string.detail_website),
+                        value = website,
+                        showChevron = true,
+                        maxLines = 1,
+                        onClick = {
+                            val uri = Uri.parse(if (website.startsWith("http")) website else "https://$website")
+                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        }
+                    )
+                }
+                
+                // Duration (extended field)
+                attraction.duration?.let { duration ->
+                    InfoRow(
+                        icon = Icons.Outlined.Timer,
+                        label = stringResource(R.string.detail_duration),
+                        value = duration
+                    )
+                }
+                
+                // Best time to visit (extended field)
+                attraction.bestTimeToVisit?.let { bestTime ->
+                    InfoRow(
+                        icon = Icons.Outlined.CalendarMonth,
+                        label = stringResource(R.string.detail_best_time),
+                        value = bestTime
+                    )
+                }
+                
+                // Operating season (extended field)
+                attraction.operatingSeason?.let { season ->
+                    InfoRow(
+                        icon = Icons.Outlined.WbSunny,
+                        label = stringResource(R.string.detail_operating_season),
+                        value = season
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            
+            // Reviews Section (like RN UnifiedAttractionSheet)
+            ReviewSection(
+                attractionId = attraction.id,
+                attractionName = attraction.name,
+                averageRating = attraction.averageRating ?: attraction.rating ?: 0f,
+                totalReviews = attraction.reviewsCount ?: 0,
+                reviews = reviews,
+                sortBy = sortBy,
+                onSortChange = { reviewViewModel.setSortBy(it) },
+                onWriteReview = { showWriteReviewModal = true },
+                onLike = { reviewId -> reviewViewModel.likeReview(reviewId) },
+                onDislike = { reviewId -> reviewViewModel.dislikeReview(reviewId) },
+                onShare = { reviewId -> /* TODO: Share review */ },
+                loading = loading
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // "More details" button
+            TextButton(
+                onClick = {
+                    scope.launch {
+                        sheetState.hide()
+                        onNavigateToDetail()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimensions.PaddingLarge)
+            ) {
+                Text(stringResource(R.string.detail_details))
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
+        
+        // Write Review Modal
+        WriteReviewModal(
+            visible = showWriteReviewModal,
+            onClose = { showWriteReviewModal = false },
+            onSubmit = { rating, text ->
+                reviewViewModel.submitReview(attraction.id, rating, text)
+            },
+            attractionName = attraction.name,
+            submitting = submitting,
+            errorMessage = errorMessage
+        )
     }
 }
 
+/**
+ * Info row component matching RN AttractionInfo style
+ */
 @Composable
-private fun InfoCard(
+private fun InfoRow(
     icon: ImageVector,
-    title: String,
-    content: @Composable ColumnScope.() -> Unit,
-    modifier: Modifier = Modifier
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    showChevron: Boolean = false,
+    maxLines: Int = Int.MAX_VALUE,
+    onClick: (() -> Unit)? = null
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-        )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        // Icon in circular container
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(Dimensions.PaddingMedium)
+                .size(36.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onSurface
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                content()
-            }
+        }
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        // Content
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        
+        // Chevron for clickable rows
+        if (showChevron && onClick != null) {
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
+    
+    // Bottom divider
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    )
 }
 
 fun formatDistance(distanceInMeters: Float): String {
     return when {
-        distanceInMeters < 1000 -> "${distanceInMeters.toInt()} m"
-        else -> "%.1f km".format(distanceInMeters / 1000)
+        distanceInMeters < 1000 -> "${distanceInMeters.toInt()} м"
+        else -> "%.1f км".format(distanceInMeters / 1000)
     }
 }

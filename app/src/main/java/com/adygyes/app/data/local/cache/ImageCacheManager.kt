@@ -9,6 +9,7 @@ import coil.request.ImageRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -34,7 +35,19 @@ class ImageCacheManager @Inject constructor(
     }
     
     val imageLoader: ImageLoader by lazy {
+        // Custom OkHttpClient with headers for external images
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("User-Agent", "AdygGIS Android App")
+                    .addHeader("Accept", "image/webp,image/png,image/jpeg,image/*,*/*")
+                    .build()
+                chain.proceed(request)
+            }
+            .build()
+
         ImageLoader.Builder(context)
+            .okHttpClient(okHttpClient)
             .memoryCache {
                 MemoryCache.Builder(context)
                     .maxSizePercent(MEMORY_CACHE_MAX_SIZE_PERCENT)

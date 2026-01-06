@@ -7,6 +7,11 @@ import androidx.room.TypeConverters
 
 /**
  * Room entity for storing attraction data
+ * 
+ * This entity includes:
+ * - All fields from Supabase (for sync)
+ * - Local-only fields like isFavorite (not synced)
+ * - Sync metadata like lastSyncedAt
  */
 @Entity(tableName = "attractions")
 @TypeConverters(Converters::class)
@@ -22,15 +27,33 @@ data class AttractionEntity(
     val directions: String?,
     val images: List<String>,
     val rating: Float?,
+    
+    // Reviews aggregate fields (from Supabase trigger)
+    val reviewsCount: Int? = null,
+    val averageRating: Float? = null,
+    
+    // Contact info
     val workingHours: String?,
     val phoneNumber: String?,
     val email: String?,
     val website: String?,
-    val isFavorite: Boolean,
     val tags: List<String>,
     val priceInfo: String?,
     val amenities: List<String>,
-    val lastUpdated: Long = System.currentTimeMillis()
+    
+    // Extended fields (unified with RN)
+    val operatingSeason: String? = null,
+    val duration: String? = null,
+    val bestTimeToVisit: String? = null,
+    
+    // Supabase metadata
+    val isPublished: Boolean = true,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+    
+    // Local-only fields (NOT synced with Supabase)
+    val isFavorite: Boolean = false,
+    val lastSyncedAt: Long = System.currentTimeMillis()
 )
 
 /**
@@ -39,11 +62,11 @@ data class AttractionEntity(
 class Converters {
     @TypeConverter
     fun fromStringList(value: List<String>?): String {
-        return value?.joinToString(separator = ",") ?: ""
+        return value?.joinToString(separator = "|||") ?: ""
     }
     
     @TypeConverter
     fun toStringList(value: String): List<String> {
-        return if (value.isEmpty()) emptyList() else value.split(",")
+        return if (value.isEmpty()) emptyList() else value.split("|||")
     }
 }

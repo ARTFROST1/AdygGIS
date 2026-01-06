@@ -120,7 +120,7 @@ implementation(libs.androidx.compose.animation)
 ## 📊 DATA & BUSINESS LOGIC
 
 ### Assets:
-- ❌ `app/src/main/assets/attractions.json` - **ОСНОВНЫЕ ДАННЫЕ**
+- ⚠️ `app/src/main/assets/attractions.json` - legacy fallback/seed (основные данные: Supabase → Room)
 - ⚠️ `geo_objects.json` - проверить использование перед удалением
 
 ### Domain Layer:
@@ -133,7 +133,8 @@ implementation(libs.androidx.compose.animation)
 - ❌ `data/repository/AttractionRepositoryImpl.kt`
 - ❌ `data/mapper/AttractionMapper.kt`
 - ❌ `data/remote/dto/AttractionDto.kt`
-- ❌ `JsonFileManager.kt`
+- ❌ `data/remote/*` и `data/sync/*` (Supabase sync)
+- ⚠️ `JsonFileManager.kt` (нужен только если оставляем legacy JSON fallback)
 
 **Зачем**: Бизнес-логика и данные приложения
 

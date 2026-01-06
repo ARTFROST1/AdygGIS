@@ -38,9 +38,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adygyes.app.R
 import com.adygyes.app.domain.model.Attraction
+import com.adygyes.app.domain.model.ReviewSortOption
 import com.adygyes.app.presentation.theme.Dimensions
 import com.adygyes.app.presentation.ui.components.*
+import com.adygyes.app.presentation.ui.components.reviews.ReviewSection
+import com.adygyes.app.presentation.ui.components.reviews.WriteReviewModal
 import com.adygyes.app.presentation.viewmodel.AttractionDetailViewModel
+import com.adygyes.app.presentation.viewmodel.ReviewViewModel
 
 /**
  * Detailed attraction information screen
@@ -53,14 +57,33 @@ fun AttractionDetailScreen(
     onBuildRoute: () -> Unit,
     onShareClick: () -> Unit,
     onShowOnMap: (() -> Unit)? = null,
-    viewModel: AttractionDetailViewModel = hiltViewModel()
+    viewModel: AttractionDetailViewModel = hiltViewModel(),
+    reviewViewModel: ReviewViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showPhotoViewer by remember { mutableStateOf(false) }
     var selectedPhotoIndex by remember { mutableIntStateOf(0) }
+    var showWriteReviewModal by remember { mutableStateOf(false) }
+    
+    // Review states
+    val reviews by reviewViewModel.reviews.collectAsStateWithLifecycle()
+    val reviewsLoading by reviewViewModel.loading.collectAsStateWithLifecycle()
+    val reviewSortBy by reviewViewModel.sortBy.collectAsStateWithLifecycle()
+    val submitting by reviewViewModel.submitting.collectAsStateWithLifecycle()
+    val errorMessage by reviewViewModel.error.collectAsStateWithLifecycle()
+    val submitSuccess by reviewViewModel.submitSuccess.collectAsStateWithLifecycle()
     
     LaunchedEffect(attractionId) {
         viewModel.loadAttraction(attractionId)
+        reviewViewModel.loadReviews(attractionId)
+    }
+    
+    // Close modal on successful submit
+    LaunchedEffect(submitSuccess) {
+        if (submitSuccess) {
+            showWriteReviewModal = false
+            reviewViewModel.resetSubmitSuccess()
+        }
     }
     
     // Handle back gesture - close photo viewer if open, otherwise navigate back
@@ -362,6 +385,29 @@ fun AttractionDetailScreen(
                             }
                         }
                     }
+                    
+                    // Reviews Section
+                    item {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = Dimensions.PaddingMedium),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        
+                        ReviewSection(
+                            attractionId = attraction.id,
+                            attractionName = attraction.name,
+                            averageRating = attraction.rating ?: 0f,
+                            totalReviews = state.reviewCount,
+                            reviews = reviews,
+                            sortBy = reviewSortBy,
+                            onSortChange = { reviewViewModel.setSortBy(it) },
+                            onWriteReview = { showWriteReviewModal = true },
+                            onLike = { reviewViewModel.likeReview(it) },
+                            onDislike = { reviewViewModel.dislikeReview(it) },
+                            onShare = { /* TODO: Share review */ },
+                            loading = reviewsLoading
+                        )
+                    }
                 }
             }
             
@@ -377,6 +423,18 @@ fun AttractionDetailScreen(
                     }
                 )
             }
+            
+            // Write Review Modal
+            WriteReviewModal(
+                visible = showWriteReviewModal,
+                onClose = { showWriteReviewModal = false },
+                onSubmit = { rating, text ->
+                    reviewViewModel.submitReview(attraction.id, rating, text)
+                },
+                attractionName = attraction.name,
+                submitting = submitting,
+                errorMessage = errorMessage
+            )
         }
     }
 }

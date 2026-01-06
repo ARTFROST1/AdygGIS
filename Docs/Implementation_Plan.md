@@ -88,9 +88,9 @@
     - **Memory efficient** - Map stays in background when Settings shown
 
 #### Data Management:
-19. **JSON Data System** - attractions.json with 10 real Adygea attractions and versioning
+19. **Offline-first Supabase Sync** - Supabase is source of truth, UI reads Room cache (delta sync via `updated_at`)
 20. **Advanced Caching** - ImageCacheManager with Coil (25% memory, 250MB disk cache)
-21. **Data Versioning** - Automatic cache invalidation and data updates when JSON version changes
+21. **Legacy JSON Fallback** - `assets/attractions.json` used only when Supabase is unavailable / as seed
 22. **Room Database** - Complete offline persistence with migration support
 23. **PreferencesManager** - DataStore-based user preferences with reactive updates
 
@@ -552,7 +552,7 @@
   - **Профессиональный дизайн**: Material 3 Card с закругленными углами, правильная типографика и цвета
   - **Документация**: Создан DATA_UPDATE_UX_ENHANCEMENT.md с подробным описанием
 - **2025-09-29: CRITICAL FIX - Version Update Stability** 🛠️:
-  - **JobCancellationException Fix**: Resolved coroutine cancellation errors when updating attractions.json version
+  - **JobCancellationException Fix (legacy JSON flow)**: Resolved coroutine cancellation errors when updating attractions.json version
   - **MapKit Object Validation**: Added `placemark.isValid` checks before all MapKit operations to prevent crashes
   - **Automatic Version Monitoring**: MapPreloadManager now monitors data version changes via PreferencesManager Flow
   - **Force Reset System**: Implemented `forceReset()` in VisualMarkerProvider and VisualMarkerRegistry for clean state transitions
@@ -576,7 +576,7 @@
   - Favorites integration with CategoryCarousel
   - Full Russian localization complete
   - Image caching system with Coil
-  - Data versioning system implemented
+  - Offline-first data layer in place (Room cache + sync)
   - Starting QA phase for testing and optimization
 - **2025-09-26: Branding Update (User-facing name + Icon)**
   - App display name changed to "AdygGIS" (no internal package rename). Files updated:
@@ -598,15 +598,15 @@
 - **2025-09-25: MAJOR UPDATE - Image Caching System Implementation** 🖼️ - Advanced image optimization and caching:
   - **ImageCacheManager**: Sophisticated caching system with Coil integration (25% memory, 250MB disk cache)
   - **ImageCacheViewModel**: UI integration with cache statistics and preloading management
-  - **Version-Based Cache Invalidation**: Automatic cache clearing when attractions.json version changes
+  - **Legacy JSON Cache Invalidation**: Only relevant for `assets/attractions.json` fallback flow
   - **Smart Preloading**: First image of each attraction preloaded on app start for instant display
   - **Lazy Loading**: Gallery images loaded on-demand to optimize performance
   - **Hardware Bitmap Fix**: Resolved Canvas compatibility issues with `.allowHardware(false)` for map markers
   - **Repository Integration**: AttractionRepositoryImpl now manages cache versioning and preloading
   - **PhotoGallery Enhancement**: Added cache policies and lazy loading for optimal image display
 - **2025-09-25: Documentation Update** - Актуализация документации после финальных изменений:
-  - **Упрощенная архитектура**: Удален Developer Mode, оставлен только assets/attractions.json
-  - **JsonFileManager**: Упрощен до чтения только из assets без кэширования
+  - **Legacy JSON fallback**: `assets/attractions.json` retained only as fallback/seed
+  - **JsonFileManager**: Retained as legacy assets reader (fallback/seed)
   - **LocaleViewModel**: Добавлена поддержка смены языка приложения
   - **MapScreenReliable**: Сохранен как резервный вариант MapScreen
 - **2025-09-27: Premium Marker Animation System ✨** - Ultra-smooth marker appearance with preloaded images:

@@ -1,5 +1,8 @@
 # Исправление проблем при обновлении версии attractions.json
 
+> Status (2026-01-06): this document describes fixes for the **legacy JSON version update** flow.
+> With offline-first Supabase sync, the app should not depend on `attractions.json` version changes for regular data updates.
+
 ## Проблема
 
 При обновлении версии файла `attractions.json` возникали критические ошибки:

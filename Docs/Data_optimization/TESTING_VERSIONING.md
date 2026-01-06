@@ -1,5 +1,8 @@
 # Тестирование системы версионирования данных
 
+> Status (2026-01-06): applies to the **legacy JSON fallback/seed** flow.
+> For the current offline-first Supabase implementation, prefer testing initial sync + delta sync (Room updates) instead of JSON version changes.
+
 ## Что было исправлено:
 
 ### 1. Убрана блокирующая проверка в MapViewModel

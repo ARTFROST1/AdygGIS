@@ -8,6 +8,7 @@ import com.adygyes.app.data.local.locale.LocaleManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import java.io.IOException
@@ -43,6 +44,8 @@ class PreferencesManager @Inject constructor(
         private val KEY_NOTIFICATION_ENABLED = booleanPreferencesKey("notification_enabled")
         private val KEY_DATA_VERSION = stringPreferencesKey("data_version")
         private val KEY_LAST_SYNC_TIME = longPreferencesKey("last_sync_time")
+        // Supabase sync timestamp (ISO 8601 string)
+        private val KEY_LAST_SYNC_TIMESTAMP = stringPreferencesKey("last_sync_timestamp")
         // Map camera state keys
         private val KEY_CAMERA_LAT = doublePreferencesKey("camera_lat")
         private val KEY_CAMERA_LON = doublePreferencesKey("camera_lon")
@@ -277,6 +280,23 @@ class PreferencesManager @Inject constructor(
     suspend fun updateLastSyncTime(timestamp: Long) {
         dataStore.edit { preferences ->
             preferences[KEY_LAST_SYNC_TIME] = timestamp
+        }
+    }
+    
+    /**
+     * Get last sync timestamp (ISO 8601 string) for Supabase delta sync
+     * Returns null if never synced
+     */
+    suspend fun getLastSyncTimestamp(): String? {
+        return dataStore.data.first()[KEY_LAST_SYNC_TIMESTAMP]
+    }
+    
+    /**
+     * Update last sync timestamp (ISO 8601 string) for Supabase delta sync
+     */
+    suspend fun updateLastSyncTimestamp(timestamp: String) {
+        dataStore.edit { preferences ->
+            preferences[KEY_LAST_SYNC_TIMESTAMP] = timestamp
         }
     }
 

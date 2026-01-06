@@ -17,46 +17,90 @@ import androidx.compose.ui.unit.sp
 import com.adygyes.app.domain.model.AttractionCategory
 
 /**
+ * Size variants for CategoryChip (unified with RN)
+ */
+enum class ChipSize {
+    SMALL,   // 28dp height, 10sp text
+    MEDIUM,  // 32dp height, 12sp text
+    LARGE    // 40dp height, 14sp text
+}
+
+/**
  * Colored chip component for displaying attraction categories
+ * Unified with RN CategoryChip component
+ * 
+ * @param category The category to display
+ * @param modifier Modifier for styling
+ * @param size Size variant (SMALL, MEDIUM, LARGE)
+ * @param showEmoji Whether to show emoji icon
+ * @param showLabel Whether to show text label
+ * @param onClick Optional click handler
  */
 @Composable
 fun CategoryChip(
     category: AttractionCategory,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
+    size: ChipSize = ChipSize.MEDIUM,
+    showEmoji: Boolean = false,
+    showLabel: Boolean = true,
+    compact: Boolean = false, // Legacy param, maps to SMALL size
     onClick: (() -> Unit)? = null
 ) {
     val backgroundColor = Color(android.graphics.Color.parseColor(category.colorHex))
     val contentColor = if (isColorDark(backgroundColor)) Color.White else Color.Black
     
+    // Size configuration (unified with RN)
+    val effectiveSize = if (compact) ChipSize.SMALL else size
+    val (textSize, emojiSize, paddingH, paddingV, cornerRadius) = when (effectiveSize) {
+        ChipSize.SMALL -> SizeConfig(10.sp, 12.sp, 8.dp, 4.dp, 14.dp)
+        ChipSize.MEDIUM -> SizeConfig(12.sp, 14.sp, 12.dp, 6.dp, 16.dp)
+        ChipSize.LARGE -> SizeConfig(14.sp, 16.sp, 16.dp, 8.dp, 20.dp)
+    }
+    
     Surface(
         modifier = modifier,
         color = backgroundColor,
-        shape = RoundedCornerShape(if (compact) 12.dp else 16.dp),
+        shape = RoundedCornerShape(cornerRadius),
         onClick = onClick ?: {}
     ) {
-        Box(
-            modifier = Modifier.padding(
-                horizontal = if (compact) 8.dp else 12.dp,
-                vertical = if (compact) 4.dp else 6.dp
-            ),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.padding(horizontal = paddingH, vertical = paddingV),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = category.displayName,
-                style = if (compact) {
-                    MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
-                } else {
-                    MaterialTheme.typography.labelMedium
-                },
-                color = contentColor,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (showEmoji) {
+                Text(
+                    text = category.emoji,
+                    fontSize = emojiSize
+                )
+                if (showLabel) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+            }
+            if (showLabel) {
+                Text(
+                    text = category.displayName,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = textSize),
+                    color = contentColor,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
+
+/**
+ * Internal size configuration data class
+ */
+private data class SizeConfig(
+    val textSize: androidx.compose.ui.unit.TextUnit,
+    val emojiSize: androidx.compose.ui.unit.TextUnit,
+    val paddingH: androidx.compose.ui.unit.Dp,
+    val paddingV: androidx.compose.ui.unit.Dp,
+    val cornerRadius: androidx.compose.ui.unit.Dp
+)
 
 /**
  * Multi-select category filter chips

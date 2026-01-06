@@ -4,6 +4,8 @@
 **Version:** 1.0.0  
 **Status:** ✅ Fully Implemented
 
+> Note (2026-01-06): the caching system remains valid. However, cache invalidation tied to `attractions.json` version changes is only relevant for the **legacy JSON fallback/seed** flow under the new offline-first Supabase sync architecture.
+
 ## 🎯 Overview
 
 The Adygyes app features a sophisticated image caching system built on top of Coil that optimizes performance, reduces network usage, and provides seamless user experience.
@@ -43,7 +45,7 @@ The Adygyes app features a sophisticated image caching system built on top of Co
 - **Cache Policies**: Enabled for both memory and disk cache
 
 ### Version-Based Cache Invalidation
-- **Automatic Cleanup**: Cache cleared when `attractions.json` version changes
+- **Legacy JSON Automatic Cleanup**: Cache cleared when `attractions.json` version changes (fallback/seed only)
 - **Repository Integration**: AttractionRepositoryImpl manages cache versioning
 - **Seamless Updates**: Users get fresh content without manual cache clearing
 

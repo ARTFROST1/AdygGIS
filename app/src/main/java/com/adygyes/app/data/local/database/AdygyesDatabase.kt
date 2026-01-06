@@ -14,7 +14,7 @@ import com.adygyes.app.data.local.entities.Converters
  */
 @Database(
     entities = [AttractionEntity::class],
-    version = 1,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -26,32 +26,103 @@ abstract class AdygyesDatabase : RoomDatabase() {
         const val DATABASE_NAME = "adygyes_database"
         
         /**
-         * Migration from version 1 to 2 (Example for future use)
+         * Migration from version 1 to 2
+         * Adds Supabase integration fields:
+         * - Extended attraction info (operatingSeason, duration, bestTimeToVisit)
+         * - Reviews aggregate (reviewsCount, averageRating)
+         * - Supabase metadata (isPublished, createdAt, updatedAt)
+         * - Sync tracking (lastSyncedAt)
+         * - Renames lastUpdated to lastSyncedAt
          */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // Example migration: Add a new column
-                // database.execSQL("ALTER TABLE attractions ADD COLUMN new_column TEXT")
+                // Add extended info fields
+                database.execSQL("ALTER TABLE attractions ADD COLUMN operatingSeason TEXT")
+                database.execSQL("ALTER TABLE attractions ADD COLUMN duration TEXT")
+                database.execSQL("ALTER TABLE attractions ADD COLUMN bestTimeToVisit TEXT")
+                
+                // Add reviews aggregate fields
+                database.execSQL("ALTER TABLE attractions ADD COLUMN reviewsCount INTEGER")
+                database.execSQL("ALTER TABLE attractions ADD COLUMN averageRating REAL")
+                
+                // Add Supabase metadata fields
+                database.execSQL("ALTER TABLE attractions ADD COLUMN isPublished INTEGER NOT NULL DEFAULT 1")
+                database.execSQL("ALTER TABLE attractions ADD COLUMN createdAt TEXT")
+                database.execSQL("ALTER TABLE attractions ADD COLUMN updatedAt TEXT")
+                
+                // Add sync tracking (renaming lastUpdated to lastSyncedAt)
+                // SQLite doesn't support column rename, so we add new column
+                database.execSQL("ALTER TABLE attractions ADD COLUMN lastSyncedAt INTEGER NOT NULL DEFAULT 0")
+                
+                // Copy data from lastUpdated to lastSyncedAt if it exists
+                // Note: This is safe even if lastUpdated doesn't exist (will just use default)
+                try {
+                    database.execSQL("UPDATE attractions SET lastSyncedAt = lastUpdated WHERE lastUpdated IS NOT NULL")
+                } catch (e: Exception) {
+                    // lastUpdated column might not exist in some cases, ignore
+                }
             }
         }
         
         /**
-         * Migration from version 2 to 3 (Example for future use)
+         * Migration from version 2 to 3
+         * Removes obsolete 'difficulty' column if it exists
+         * (SQLite doesn't support DROP COLUMN before version 3.35.0, so we recreate the table)
          */
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // Example migration: Create a new table
-                // database.execSQL("""
-                //     CREATE TABLE IF NOT EXISTS `reviews` (
-                //         `id` TEXT NOT NULL,
-                //         `attraction_id` TEXT NOT NULL,
-                //         `user_name` TEXT NOT NULL,
-                //         `rating` REAL NOT NULL,
-                //         `comment` TEXT,
-                //         `date` INTEGER NOT NULL,
-                //         PRIMARY KEY(`id`)
-                //     )
-                // """)
+                // Check if difficulty column exists (it shouldn't based on schema, but some DBs might have it)
+                // Recreate the table without 'difficulty' column
+                
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS attractions_new (
+                        id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        latitude REAL NOT NULL,
+                        longitude REAL NOT NULL,
+                        address TEXT,
+                        directions TEXT,
+                        images TEXT NOT NULL,
+                        rating REAL,
+                        reviewsCount INTEGER,
+                        averageRating REAL,
+                        workingHours TEXT,
+                        phoneNumber TEXT,
+                        email TEXT,
+                        website TEXT,
+                        tags TEXT NOT NULL,
+                        priceInfo TEXT,
+                        amenities TEXT NOT NULL,
+                        operatingSeason TEXT,
+                        duration TEXT,
+                        bestTimeToVisit TEXT,
+                        isPublished INTEGER NOT NULL,
+                        createdAt TEXT,
+                        updatedAt TEXT,
+                        isFavorite INTEGER NOT NULL,
+                        lastSyncedAt INTEGER NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                """.trimIndent())
+                
+                // Copy data from old table (excluding difficulty column if it exists)
+                database.execSQL("""
+                    INSERT INTO attractions_new 
+                    SELECT id, name, description, category, latitude, longitude, 
+                           address, directions, images, rating, reviewsCount, averageRating,
+                           workingHours, phoneNumber, email, website, tags, priceInfo, amenities,
+                           operatingSeason, duration, bestTimeToVisit, isPublished, createdAt, updatedAt,
+                           isFavorite, lastSyncedAt
+                    FROM attractions
+                """.trimIndent())
+                
+                // Drop old table
+                database.execSQL("DROP TABLE attractions")
+                
+                // Rename new table
+                database.execSQL("ALTER TABLE attractions_new RENAME TO attractions")
             }
         }
         
@@ -60,9 +131,8 @@ abstract class AdygyesDatabase : RoomDatabase() {
          */
         fun getMigrations(): Array<Migration> {
             return arrayOf(
-                // Add migrations here as database evolves
-                // MIGRATION_1_2,
-                // MIGRATION_2_3
+                MIGRATION_1_2,
+                MIGRATION_2_3
             )
         }
     }

@@ -1,45 +1,40 @@
 package com.adygyes.app.domain.usecase
 
 import com.adygyes.app.data.local.preferences.PreferencesManager
+import com.adygyes.app.data.sync.SyncService
 import com.adygyes.app.domain.repository.AttractionRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import timber.log.Timber
-import java.text.SimpleDateFormat
-import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Use case for data synchronization and update checking
+ * Use case for data synchronization with Supabase.
+ * 
+ * OFFLINE-FIRST approach:
+ * - Room DB is always read first (instant)
+ * - Supabase sync happens in background
+ * - Delta sync only fetches changes
  */
 @Singleton
 class DataSyncUseCase @Inject constructor(
     private val attractionRepository: AttractionRepository,
     private val preferencesManager: PreferencesManager,
-    private val networkUseCase: NetworkUseCase
+    private val networkUseCase: NetworkUseCase,
+    private val syncService: SyncService
 ) {
     
-    companion object {
-        private const val LAST_UPDATE_CHECK_KEY = "last_update_check"
-        private const val LAST_SUCCESSFUL_SYNC_KEY = "last_successful_sync"
-        private const val DATA_VERSION_KEY = "data_version"
-        private const val UPDATE_CHECK_INTERVAL_HOURS = 24L
-        private const val FORCE_UPDATE_INTERVAL_DAYS = 7L
-    }
-    
     /**
-     * Check if data needs to be updated
+     * Check if initial sync is needed (Room is empty)
      */
     suspend fun shouldCheckForUpdates(): Boolean {
-        // For now, we'll use a simple time-based check
-        // In a real implementation, this would check against stored preferences
-        return true // Always check for updates for now
+        return !attractionRepository.isDataLoaded()
     }
     
     /**
-     * Check for data updates from remote source
+     * Check for data updates from Supabase
      */
     suspend fun checkForUpdates(): UpdateCheckResult {
         return try {
@@ -47,17 +42,16 @@ class DataSyncUseCase @Inject constructor(
                 return UpdateCheckResult.NoConnection
             }
             
-            // Simulate checking for updates (in real app, this would call an API)
-            delay(1000) // Simulate network delay
+            // Check last sync timestamp
+            val lastSync = preferencesManager.getLastSyncTimestamp()
             
-            val currentVersion = "1.0.0" // Default version
-            val latestVersion = getLatestDataVersion() // This would be an API call
-            
-            if (isNewerVersion(latestVersion, currentVersion)) {
-                Timber.d("Update available: $currentVersion -> $latestVersion")
-                UpdateCheckResult.UpdateAvailable(latestVersion)
+            if (lastSync == null) {
+                // Never synced - update available
+                Timber.d("First sync needed")
+                UpdateCheckResult.UpdateAvailable("initial")
             } else {
-                Timber.d("Data is up to date: $currentVersion")
+                // Already synced - check for delta
+                Timber.d("Last sync: $lastSync")
                 UpdateCheckResult.UpToDate
             }
         } catch (e: Exception) {
@@ -67,55 +61,38 @@ class DataSyncUseCase @Inject constructor(
     }
     
     /**
-     * Perform data synchronization
+     * Perform data synchronization with Supabase
      */
     fun syncData(): Flow<SyncProgress> = flow {
         try {
             emit(SyncProgress.Started)
             
             if (!networkUseCase.isOnline()) {
-                emit(SyncProgress.Error("No internet connection"))
+                // Offline mode - data is already in Room, just report success
+                emit(SyncProgress.Completed("Offline mode - using cached data"))
                 return@flow
             }
             
             emit(SyncProgress.CheckingForUpdates)
-            delay(500)
             
-            val updateResult = checkForUpdates()
-            when (updateResult) {
-                is UpdateCheckResult.UpdateAvailable -> {
-                    emit(SyncProgress.DownloadingData(0))
-                    
-                    // Simulate downloading data with progress
-                    for (progress in 0..100 step 10) {
-                        delay(200)
-                        emit(SyncProgress.DownloadingData(progress))
-                    }
-                    
-                    emit(SyncProgress.ProcessingData)
-                    delay(1000)
-                    
-                    // In real implementation, this would download and process new data
-                    // For now, we'll just reload existing data
-                    attractionRepository.loadInitialData()
-                    
-                    // Update version and sync timestamp
-                    preferencesManager.updateDataVersion(updateResult.version)
-                    preferencesManager.updateLastSyncTime(System.currentTimeMillis())
-                    
-                    emit(SyncProgress.Completed("Data updated to version ${updateResult.version}"))
+            // Perform Supabase delta sync
+            emit(SyncProgress.DownloadingData(20))
+            
+            val result = syncService.performSync()
+            
+            emit(SyncProgress.DownloadingData(80))
+            
+            if (result.success) {
+                val message = when {
+                    result.added > 0 || result.updated > 0 || result.deleted > 0 ->
+                        "Synced: +${result.added} ~${result.updated} -${result.deleted}"
+                    else -> "Data is up to date"
                 }
-                UpdateCheckResult.UpToDate -> {
-                    preferencesManager.updateLastSyncTime(System.currentTimeMillis())
-                    emit(SyncProgress.Completed("Data is already up to date"))
-                }
-                UpdateCheckResult.NoConnection -> {
-                    emit(SyncProgress.Error("No internet connection"))
-                }
-                is UpdateCheckResult.Error -> {
-                    emit(SyncProgress.Error(updateResult.message))
-                }
+                emit(SyncProgress.Completed(message))
+            } else {
+                emit(SyncProgress.Error(result.errorMessage ?: "Sync failed"))
             }
+            
         } catch (e: Exception) {
             Timber.e(e, "Error during data sync")
             emit(SyncProgress.Error(e.message ?: "Sync failed"))
@@ -123,20 +100,24 @@ class DataSyncUseCase @Inject constructor(
     }
     
     /**
-     * Force data refresh (bypass cache)
+     * Force full data refresh from Supabase (ignores delta)
      */
     suspend fun forceRefresh(): Boolean {
         return try {
             if (!networkUseCase.isOnline()) {
+                Timber.w("Cannot force refresh - offline")
                 return false
             }
             
-            // Clear existing data and reload
-            attractionRepository.loadInitialData()
-            preferencesManager.updateLastSyncTime(System.currentTimeMillis())
+            val result = syncService.forceFullSync()
             
-            Timber.d("Force refresh completed")
-            true
+            if (result.success) {
+                Timber.d("Force refresh completed: ${result.added} attractions")
+                true
+            } else {
+                Timber.e("Force refresh failed: ${result.errorMessage}")
+                false
+            }
         } catch (e: Exception) {
             Timber.e(e, "Force refresh failed")
             false
@@ -147,54 +128,29 @@ class DataSyncUseCase @Inject constructor(
      * Get last sync information
      */
     suspend fun getLastSyncInfo(): SyncInfo {
-        // For now, return default values since we need to access preferences flow
+        val lastSync = preferencesManager.getLastSyncTimestamp()
         return SyncInfo(
-            lastSyncTime = null, // Would need to get from preferences flow
-            dataVersion = "1.0.0", // Default version
-            lastUpdateCheck = null, // Would need to get from preferences flow
+            lastSyncTime = lastSync?.let { parseTimestamp(it) },
+            dataVersion = "supabase", // Version is managed by Supabase
+            lastUpdateCheck = lastSync?.let { parseTimestamp(it) },
             isDataLoaded = attractionRepository.isDataLoaded()
         )
     }
     
     /**
-     * Check if force update is needed (data is too old)
+     * Check if force update is needed
      */
     suspend fun needsForceUpdate(): Boolean {
-        // For now, return false since we don't have easy access to sync timestamp
-        // In a real implementation, this would check the preferences
+        // With Supabase, force update is rarely needed
+        // Delta sync handles most cases
         return false
     }
     
-    /**
-     * Simulate getting latest version from server
-     */
-    private suspend fun getLatestDataVersion(): String {
-        // In real implementation, this would be an API call
-        delay(500)
-        return "1.1.0" // Simulate newer version available
-    }
-    
-    /**
-     * Compare version strings
-     */
-    private fun isNewerVersion(newVersion: String, currentVersion: String): Boolean {
+    private fun parseTimestamp(isoString: String): Long? {
         return try {
-            val newParts = newVersion.split(".").map { it.toInt() }
-            val currentParts = currentVersion.split(".").map { it.toInt() }
-            
-            for (i in 0 until maxOf(newParts.size, currentParts.size)) {
-                val newPart = newParts.getOrElse(i) { 0 }
-                val currentPart = currentParts.getOrElse(i) { 0 }
-                
-                when {
-                    newPart > currentPart -> return true
-                    newPart < currentPart -> return false
-                }
-            }
-            false
+            java.time.Instant.parse(isoString).toEpochMilli()
         } catch (e: Exception) {
-            Timber.e(e, "Error comparing versions: $newVersion vs $currentVersion")
-            false
+            null
         }
     }
 }
@@ -225,20 +181,22 @@ sealed class SyncProgress {
  * Information about last sync
  */
 data class SyncInfo(
-    val lastSyncTime: Date?,
+    val lastSyncTime: Long?,
     val dataVersion: String,
-    val lastUpdateCheck: Date?,
+    val lastUpdateCheck: Long?,
     val isDataLoaded: Boolean
 ) {
     fun getLastSyncFormatted(): String {
         return lastSyncTime?.let { 
-            SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(it)
+            java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(it))
         } ?: "Никогда"
     }
     
     fun getLastCheckFormatted(): String {
         return lastUpdateCheck?.let { 
-            SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(it)
+            java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(it))
         } ?: "Никогда"
     }
 }

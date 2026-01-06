@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import timber.log.Timber
+import com.adygyes.app.data.sync.SyncService
 import javax.inject.Inject
 
 /**
@@ -36,7 +37,8 @@ class MapViewModel @Inject constructor(
     private val shareUseCase: ShareUseCase,
     private val networkUseCase: NetworkUseCase,
     private val attractionDisplayUseCase: AttractionDisplayUseCase,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val syncService: SyncService
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(MapUiState())
@@ -144,22 +146,38 @@ class MapViewModel @Inject constructor(
     
     init {
         loadAttractions()
-        checkAndLoadInitialData()
         observeLocationSettings()
         observeDataVersionChanges()
+        performInitialSupabaseSync()
     }
     
-    private fun checkAndLoadInitialData() {
+    /**
+     * Perform initial sync with Supabase on app startup.
+     * Uses delta sync to only fetch changes since last sync.
+     */
+    private fun performInitialSupabaseSync() {
         viewModelScope.launch {
             try {
-                // Always call loadInitialData() - it now handles version checking internally
-                Timber.d("Checking data version and loading if needed...")
-                attractionRepository.loadInitialData()
+                Timber.d("🔄 Starting initial Supabase sync...")
+                val result = syncService.performSync()
+                if (result.success) {
+                    Timber.d("✅ Supabase sync complete: +${result.added} updated=${result.updated} deleted=${result.deleted}")
+                    // Reload attractions if there were any changes
+                    if (result.added > 0 || result.updated > 0 || result.deleted > 0) {
+                        loadAttractions()
+                    }
+                } else {
+                    Timber.w("⚠️ Supabase sync failed: ${result.errorMessage}")
+                }
             } catch (e: Exception) {
-                Timber.e(e, "Error loading initial data")
+                Timber.e(e, "❌ Error during Supabase sync")
             }
         }
     }
+    
+    // NOTE:
+    // Initial data should come from Supabase via SyncService.
+    // Loading from assets JSON here can overwrite Supabase truth and cause inconsistencies.
     
     /**
      * Отслеживает изменения версии данных и принудительно перезагружает attractions

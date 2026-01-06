@@ -336,7 +336,7 @@ implementation(libs.compose.zoomable) // ~80 KB
 
 | Файл | Размер | Использование | Действие |
 |------|--------|---------------|----------|
-| `attractions.json` | 57 KB | ✅ Основные данные | Минифицировать |
+| `attractions.json` | 57 KB | ⚠️ Legacy fallback/seed | Минифицировать (опционально) |
 | `geo_objects.json` | 9 KB | ❌ НЕ используется | Удалить |
 | `images/` (папка) | 0 | Пустая | Удалить |
 

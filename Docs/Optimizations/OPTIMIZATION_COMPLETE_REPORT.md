@@ -249,7 +249,7 @@ ls -lh app/build/outputs/apk/full/release/*.apk
 - FavoritesScreen
 
 ### ✅ Все используемые ресурсы:
-- attractions.json (основные данные)
+- attractions.json (legacy fallback/seed; основные данные: Supabase → Room)
 - Все drawable (иконки, векторы)
 - Launcher icons
 - dombay_background.jpg (пока не заменен)
