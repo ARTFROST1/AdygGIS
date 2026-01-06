@@ -134,12 +134,27 @@ fun WriteReviewModal(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             // Interactive stars
-                            InteractiveRatingLarge(
-                                value = rating,
-                                onRatingChange = { rating = it },
-                                size = 48,
-                                spacing = 12
-                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                repeat(5) { index ->
+                                    val starIndex = index + 1
+                                    val isFilled = starIndex <= rating
+                                    
+                                    IconButton(
+                                        onClick = { rating = starIndex },
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isFilled) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                            contentDescription = "Оценка $starIndex",
+                                            modifier = Modifier.size(40.dp),
+                                            tint = if (isFilled) Color(0xFFFFB300) else MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+                            }
                             
                             Spacer(modifier = Modifier.height(12.dp))
                             

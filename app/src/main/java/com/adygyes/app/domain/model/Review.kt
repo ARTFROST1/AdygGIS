@@ -17,10 +17,31 @@ data class Review(
     val text: String? = null,
     val createdAt: Instant,
     val updatedAt: Instant? = null,
-    val likes: Int = 0,
-    val dislikes: Int = 0,
-    val isOwn: Boolean = false // Whether this is current user's review
+    val likesCount: Int = 0,        // ← RENAMED from 'likes'
+    val dislikesCount: Int = 0,     // ← RENAMED from 'dislikes'
+    val userReaction: ReviewReaction = ReviewReaction.NONE, // ← NEW
+    val isOwn: Boolean = false, // Whether this is current user's review
+    val status: String? = null, // 'pending', 'approved', 'rejected'
+    val rejectionReason: String? = null // Reason if rejected
 )
+
+/**
+ * Check if review is pending moderation
+ */
+val Review.isPending: Boolean
+    get() = status == "pending"
+
+/**
+ * Check if review is approved
+ */
+val Review.isApproved: Boolean
+    get() = status == "approved" || status == null
+
+/**
+ * Check if review is rejected
+ */
+val Review.isRejected: Boolean
+    get() = status == "rejected"
 
 /**
  * Data for submitting a new review

@@ -17,7 +17,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adygyes.app.R
 import com.adygyes.app.presentation.theme.Dimensions
 import com.adygyes.app.presentation.viewmodel.SettingsViewModel
+import com.adygyes.app.presentation.viewmodel.AuthViewModel
+import com.adygyes.app.presentation.viewmodel.AuthEvent
 import com.adygyes.app.presentation.ui.components.RatingComingSoonDialog
+import com.adygyes.app.presentation.ui.components.auth.AuthModal
+import com.adygyes.app.domain.model.AuthState
+import com.adygyes.app.domain.model.currentUser
 import android.widget.Toast
 import android.content.Intent
 import android.net.Uri
@@ -35,21 +40,53 @@ fun SettingsScreen(
     onNavigateToAbout: () -> Unit,
     onNavigateToPrivacy: () -> Unit,
     onNavigateToTerms: () -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val authState by authViewModel.authState.collectAsStateWithLifecycle()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showRatingDialog by remember { mutableStateOf(false) }
+    var showAuthModal by remember { mutableStateOf(false) }
+    var showSignOutConfirm by remember { mutableStateOf(false) }
     // Easter egg: 7 taps on title
     var tapCount by remember { mutableStateOf(0) }
     var lastTapTime by remember { mutableStateOf(0L) }
     
     // Protection against double-click on back button - prevents multiple popBackStack calls
     var isNavigating by remember { mutableStateOf(false) }
+    
+    // Handle auth events
+    LaunchedEffect(Unit) {
+        authViewModel.events.collect { event ->
+            when (event) {
+                is AuthEvent.SignInSuccess -> {
+                    showAuthModal = false
+                    Toast.makeText(context, "Добро пожаловать, ${event.user.displayName ?: event.user.email}!", Toast.LENGTH_SHORT).show()
+                }
+                is AuthEvent.SignUpSuccess -> {
+                    showAuthModal = false
+                    Toast.makeText(context, "Регистрация успешна!", Toast.LENGTH_SHORT).show()
+                }
+                is AuthEvent.SignUpNeedsConfirmation -> {
+                    showAuthModal = false
+                    Toast.makeText(context, "Письмо для подтверждения отправлено на ${event.email}", Toast.LENGTH_LONG).show()
+                }
+                is AuthEvent.SignOutSuccess -> {
+                    Toast.makeText(context, "Вы вышли из аккаунта", Toast.LENGTH_SHORT).show()
+                }
+                is AuthEvent.PasswordResetSent -> {
+                    showAuthModal = false
+                    Toast.makeText(context, "Письмо для сброса пароля отправлено на ${event.email}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
     
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -115,6 +152,45 @@ fun SettingsScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(vertical = Dimensions.PaddingSmall)
         ) {
+            // Account Section
+            item {
+                SettingsSectionHeader(title = "Аккаунт")
+            }
+            
+            item {
+                when (authState) {
+                    is AuthState.Authenticated -> {
+                        val user = authState.currentUser
+                        SettingsItem(
+                            icon = Icons.Default.Person,
+                            title = user?.displayName ?: user?.email ?: "Пользователь",
+                            subtitle = if (user?.displayName != null) user.email else "Нажмите, чтобы выйти",
+                            onClick = { showSignOutConfirm = true }
+                        )
+                    }
+                    is AuthState.Loading, is AuthState.Unknown -> {
+                        SettingsItem(
+                            icon = Icons.Default.Person,
+                            title = "Загрузка...",
+                            subtitle = "Проверка сессии",
+                            onClick = { }
+                        )
+                    }
+                    else -> {
+                        SettingsItem(
+                            icon = Icons.Default.Login,
+                            title = "Войти",
+                            subtitle = "Авторизуйтесь, чтобы оставлять отзывы",
+                            onClick = { showAuthModal = true }
+                        )
+                    }
+                }
+            }
+            
+            item {
+                Spacer(modifier = Modifier.height(Dimensions.SpacingMedium))
+            }
+            
             // Appearance Section
             item {
                 SettingsSectionHeader(title = stringResource(R.string.settings_appearance))
@@ -295,6 +371,51 @@ fun SettingsScreen(
         isVisible = showRatingDialog,
         onDismiss = { showRatingDialog = false }
     )
+    
+    // Auth Modal
+    AuthModal(
+        visible = showAuthModal,
+        onClose = { 
+            showAuthModal = false 
+            authViewModel.clearError()
+        },
+        onSignIn = { email, password -> 
+            authViewModel.signIn(email, password) 
+        },
+        onSignUp = { email, password, displayName -> 
+            authViewModel.signUp(email, password, displayName) 
+        },
+        onForgotPassword = { email -> 
+            authViewModel.resetPassword(email) 
+        },
+        isLoading = authUiState.isLoading,
+        errorMessage = authUiState.error,
+        onClearError = { authViewModel.clearError() }
+    )
+    
+    // Sign Out Confirmation Dialog
+    if (showSignOutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirm = false },
+            title = { Text("Выход") },
+            text = { Text("Вы уверены, что хотите выйти из аккаунта?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSignOutConfirm = false
+                        authViewModel.signOut()
+                    }
+                ) {
+                    Text("Выйти", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutConfirm = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
 }
 
 @Composable

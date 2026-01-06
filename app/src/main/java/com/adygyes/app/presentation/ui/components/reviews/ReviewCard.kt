@@ -6,6 +6,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
@@ -18,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.adygyes.app.domain.model.Review
+import com.adygyes.app.domain.model.ReviewReaction
 import com.adygyes.app.presentation.theme.Dimensions
 import java.time.Instant
 import java.time.ZoneId
@@ -143,25 +146,35 @@ fun ReviewCard(
             ) {
                 // Like button
                 onLike?.let { onLikeClick ->
+                    val isLiked = review.userReaction == ReviewReaction.LIKE
                     IconButton(
                         onClick = { onLikeClick(review.id) },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(32.dp),
+                        enabled = !review.isOwn
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.ThumbUp,
+                                imageVector = if (isLiked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
                                 contentDescription = "Like",
                                 modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = if (isLiked) 
+                                    MaterialTheme.colorScheme.primary 
+                                else if (!review.isOwn)
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                else
+                                    MaterialTheme.colorScheme.outline
                             )
-                            if (review.likes > 0) {
+                            if (review.likesCount > 0) {
                                 Text(
-                                    text = review.likes.toString(),
+                                    text = review.likesCount.toString(),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isLiked) 
+                                        MaterialTheme.colorScheme.primary 
+                                    else 
+                                        MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -170,25 +183,35 @@ fun ReviewCard(
                 
                 // Dislike button
                 onDislike?.let { onDislikeClick ->
+                    val isDisliked = review.userReaction == ReviewReaction.DISLIKE
                     IconButton(
                         onClick = { onDislikeClick(review.id) },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(32.dp),
+                        enabled = !review.isOwn
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.ThumbDown,
+                                imageVector = if (isDisliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown,
                                 contentDescription = "Dislike",
                                 modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = if (isDisliked) 
+                                    MaterialTheme.colorScheme.error 
+                                else if (!review.isOwn)
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                else
+                                    MaterialTheme.colorScheme.outline
                             )
-                            if (review.dislikes > 0) {
+                            if (review.dislikesCount > 0) {
                                 Text(
-                                    text = review.dislikes.toString(),
+                                    text = review.dislikesCount.toString(),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isDisliked) 
+                                        MaterialTheme.colorScheme.error 
+                                    else 
+                                        MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }

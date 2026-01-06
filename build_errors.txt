@@ -1,0 +1,131 @@
+﻿> Task :app:preBuild UP-TO-DATE
+> Task :app:preFullDebugBuild UP-TO-DATE
+> Task :app:mergeFullDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateFullDebugBuildConfig UP-TO-DATE
+> Task :app:checkFullDebugAarMetadata UP-TO-DATE
+> Task :app:generateFullDebugResValues UP-TO-DATE
+> Task :app:mapFullDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateFullDebugResources UP-TO-DATE
+> Task :app:mergeFullDebugResources UP-TO-DATE
+> Task :app:packageFullDebugResources UP-TO-DATE
+> Task :app:parseFullDebugLocalResources UP-TO-DATE
+> Task :app:createFullDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksFullDebug UP-TO-DATE
+> Task :app:processFullDebugMainManifest UP-TO-DATE
+> Task :app:processFullDebugManifest UP-TO-DATE
+> Task :app:processFullDebugManifestForPackage UP-TO-DATE
+> Task :app:processFullDebugResources UP-TO-DATE
+> Task :app:kspFullDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileFullDebug UP-TO-DATE
+> Task :app:mergeFullDebugShaders UP-TO-DATE
+> Task :app:compileFullDebugShaders NO-SOURCE
+> Task :app:generateFullDebugAssets UP-TO-DATE
+> Task :app:mergeFullDebugAssets UP-TO-DATE
+> Task :app:compressFullDebugAssets UP-TO-DATE
+> Task :app:checkFullDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarFullDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexFullDebug UP-TO-DATE
+> Task :app:mergeLibDexFullDebug UP-TO-DATE
+> Task :app:mergeFullDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeFullDebugNativeLibs UP-TO-DATE
+> Task :app:stripFullDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningFullDebug UP-TO-DATE
+> Task :app:writeFullDebugAppMetadata UP-TO-DATE
+> Task :app:writeFullDebugSigningConfigVersions UP-TO-DATE
+> Task :app:preLiteDebugBuild UP-TO-DATE
+> Task :app:mergeLiteDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateLiteDebugBuildConfig UP-TO-DATE
+> Task :app:checkLiteDebugAarMetadata UP-TO-DATE
+> Task :app:generateLiteDebugResValues UP-TO-DATE
+> Task :app:mapLiteDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateLiteDebugResources UP-TO-DATE
+> Task :app:mergeLiteDebugResources UP-TO-DATE
+> Task :app:packageLiteDebugResources UP-TO-DATE
+> Task :app:parseLiteDebugLocalResources UP-TO-DATE
+> Task :app:createLiteDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksLiteDebug UP-TO-DATE
+> Task :app:processLiteDebugMainManifest UP-TO-DATE
+> Task :app:processLiteDebugManifest UP-TO-DATE
+> Task :app:processLiteDebugManifestForPackage UP-TO-DATE
+> Task :app:processLiteDebugResources UP-TO-DATE
+> Task :app:javaPreCompileLiteDebug UP-TO-DATE
+> Task :app:mergeLiteDebugShaders UP-TO-DATE
+> Task :app:compileLiteDebugShaders NO-SOURCE
+> Task :app:generateLiteDebugAssets UP-TO-DATE
+> Task :app:mergeLiteDebugAssets UP-TO-DATE
+> Task :app:compressLiteDebugAssets UP-TO-DATE
+> Task :app:checkLiteDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarLiteDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexLiteDebug UP-TO-DATE
+> Task :app:mergeLibDexLiteDebug UP-TO-DATE
+> Task :app:mergeLiteDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeLiteDebugNativeLibs UP-TO-DATE
+> Task :app:stripLiteDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningLiteDebug UP-TO-DATE
+> Task :app:writeLiteDebugAppMetadata UP-TO-DATE
+> Task :app:writeLiteDebugSigningConfigVersions UP-TO-DATE
+> Task :app:kspLiteDebugKotlin
+
+> Task :app:compileFullDebugKotlin FAILED
+.\gradlew.bat : e: file:///C:/Users/moroz/Desktop/AdygGIS/Adyhyes
+KOTLIN/app/src/main/java/com/adygyes/app/data/repository/ReviewRe
+pository.kt:390:21 No parameter with name 'body' found.
+At line:1 char:1
++ .\gradlew.bat assembleDebug 2>&1 | Out-File -FilePath .\build_e
+rrors. ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (e: file:///C:/U...e 
+    'body' found.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+e: file:///C:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/m
+ain/java/com/adygyes/app/data/repository/ReviewRepository.kt:390:
+21 No value passed for parameter 'request'.
+
+> Task :app:compileLiteDebugKotlin FAILED
+e: file:///C:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/m
+ain/java/com/adygyes/app/data/repository/ReviewRepository.kt:390:
+21 No parameter with name 'body' found.
+e: file:///C:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/m
+ain/java/com/adygyes/app/data/repository/ReviewRepository.kt:390:
+21 No value passed for parameter 'request'.
+
+FAILURE: Build completed with 2 failures.
+
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':app:compileFullDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compile
+rRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkA
+ction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+=================================================================
+=============
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':app:compileLiteDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compile
+rRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkA
+ction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+=================================================================
+=============
+
+BUILD FAILED in 5s
+60 actionable tasks: 3 executed, 57 up-to-date

@@ -27,12 +27,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adygyes.app.R
 import com.adygyes.app.domain.model.Attraction
 import com.adygyes.app.domain.model.ReviewSortOption
 import com.adygyes.app.presentation.theme.Dimensions
 import com.adygyes.app.presentation.ui.components.reviews.ReviewSection
 import com.adygyes.app.presentation.ui.components.reviews.WriteReviewModal
+import com.adygyes.app.presentation.ui.components.auth.AuthModal
+import com.adygyes.app.presentation.viewmodel.AuthEvent
+import com.adygyes.app.presentation.viewmodel.AuthViewModel
 import com.adygyes.app.presentation.viewmodel.ReviewViewModel
 import kotlinx.coroutines.launch
 
@@ -59,7 +63,8 @@ fun AttractionBottomSheet(
     onShare: () -> Unit,
     modifier: Modifier = Modifier,
     distance: Float? = null,
-    reviewViewModel: ReviewViewModel = hiltViewModel()
+    reviewViewModel: ReviewViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = false
@@ -67,6 +72,7 @@ fun AttractionBottomSheet(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var showWriteReviewModal by remember { mutableStateOf(false) }
+    var showAuthModal by remember { mutableStateOf(false) }
     
     // Load reviews when attraction changes
     LaunchedEffect(attraction.id) {
@@ -74,17 +80,57 @@ fun AttractionBottomSheet(
     }
     
     val reviews by reviewViewModel.reviews.collectAsState()
+    val userOwnReviews by reviewViewModel.userOwnReviews.collectAsState()
     val sortBy by reviewViewModel.sortBy.collectAsState()
     val loading by reviewViewModel.loading.collectAsState()
     val submitting by reviewViewModel.submitting.collectAsState()
     val errorMessage by reviewViewModel.error.collectAsState()
     val submitSuccess by reviewViewModel.submitSuccess.collectAsState()
+    val showAuthRequired by reviewViewModel.showAuthRequired.collectAsState()
     
-    // Close modal on successful submit
+    // Auth states
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    
+    // Show auth modal when auth is required
+    LaunchedEffect(showAuthRequired) {
+        if (showAuthRequired) {
+            showAuthModal = true
+            reviewViewModel.dismissAuthRequired()
+        }
+    }
+    
+    // Handle auth events
+    LaunchedEffect(Unit) {
+        authViewModel.events.collect { event ->
+            when (event) {
+                is AuthEvent.SignInSuccess, is AuthEvent.SignUpSuccess -> {
+                    showAuthModal = false
+                    showWriteReviewModal = true
+                }
+                is AuthEvent.SignUpNeedsConfirmation -> {
+                    showAuthModal = false
+                    android.widget.Toast.makeText(
+                        context, 
+                        "Письмо для подтверждения отправлено на ${event.email}", 
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                else -> {}
+            }
+        }
+    }
+    
+    // Close modal on successful submit and show success message
     LaunchedEffect(submitSuccess) {
         if (submitSuccess) {
             showWriteReviewModal = false
             reviewViewModel.resetSubmitSuccess()
+            // Show success toast
+            android.widget.Toast.makeText(
+                context, 
+                "Отзыв отправлен на модерацию", 
+                android.widget.Toast.LENGTH_LONG
+            ).show()
         }
     }
     
@@ -394,11 +440,16 @@ fun AttractionBottomSheet(
                 averageRating = attraction.averageRating ?: attraction.rating ?: 0f,
                 totalReviews = attraction.reviewsCount ?: 0,
                 reviews = reviews,
+                userOwnReviews = userOwnReviews,
                 sortBy = sortBy,
                 onSortChange = { reviewViewModel.setSortBy(it) },
-                onWriteReview = { showWriteReviewModal = true },
-                onLike = { reviewId -> reviewViewModel.likeReview(reviewId) },
-                onDislike = { reviewId -> reviewViewModel.dislikeReview(reviewId) },
+                onWriteReview = { 
+                    if (reviewViewModel.canWriteReview()) {
+                        showWriteReviewModal = true
+                    }
+                },
+                onLike = { reviewId -> reviewViewModel.reactToReview(reviewId, true) },
+                onDislike = { reviewId -> reviewViewModel.reactToReview(reviewId, false) },
                 onShare = { reviewId -> /* TODO: Share review */ },
                 loading = loading
             )
@@ -436,6 +487,27 @@ fun AttractionBottomSheet(
             attractionName = attraction.name,
             submitting = submitting,
             errorMessage = errorMessage
+        )
+        
+        // Auth Modal for review
+        AuthModal(
+            visible = showAuthModal,
+            onClose = { 
+                showAuthModal = false
+                authViewModel.clearError()
+            },
+            onSignIn = { email, password -> 
+                authViewModel.signIn(email, password) 
+            },
+            onSignUp = { email, password, displayName -> 
+                authViewModel.signUp(email, password, displayName) 
+            },
+            onForgotPassword = { email -> 
+                authViewModel.resetPassword(email) 
+            },
+            isLoading = authUiState.isLoading,
+            errorMessage = authUiState.error,
+            onClearError = { authViewModel.clearError() }
         )
     }
 }

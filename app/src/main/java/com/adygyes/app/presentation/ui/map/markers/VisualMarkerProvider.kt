@@ -20,12 +20,14 @@ import kotlinx.coroutines.*
  */
 class VisualMarkerProvider(
     private val mapView: MapView,
-    private val imageCacheManager: ImageCacheManager
+    private val imageCacheManager: ImageCacheManager,
+    externalScope: CoroutineScope? = null // Allow passing lifecycle-aware scope
 ) {
     private val mapObjectCollection = mapView.map.mapObjects
     private val markers = mutableMapOf<String, PlacemarkMapObject>()
     private val markerImages = mutableMapOf<String, ImageProvider>()
-    private var coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    // Use provided lifecycle scope or fallback to custom scope
+    private var coroutineScope = externalScope ?: CoroutineScope(Dispatchers.Main + SupervisorJob())
     
     // Animation settings - optimized for maximum smoothness
     private var enableAppearAnimation = true
@@ -758,6 +760,12 @@ class VisualMarkerProvider(
                     }
                 }
                 
+                // Check if coroutine is still active before updating UI
+                if (!isActive) {
+                    Timber.d("⚠️ Skipping marker update for ${attraction.name} - coroutine cancelled")
+                    return@withContext
+                }
+                
                 withContext(Dispatchers.Main) {
                     // Create circular image with loaded bitmap
                     val circularBitmap = createCircularBitmapWithImage(
@@ -774,14 +782,16 @@ class VisualMarkerProvider(
                         Timber.d("📥 Downloaded marker image for ${attraction.name}")
                     }
                     
-                    // Update marker
-                    val imageProvider = ImageProvider.fromBitmap(circularBitmap)
-                    markers[attraction.id]?.setIcon(imageProvider)
+                    // Update marker only if it still exists
+                    markers[attraction.id]?.setIcon(ImageProvider.fromBitmap(circularBitmap))
                     
                     // Update cache
                     val cacheKey = "${attraction.id}_${if (isSelected) "selected" else "normal"}"
-                    markerImages[cacheKey] = imageProvider
+                    markerImages[cacheKey] = ImageProvider.fromBitmap(circularBitmap)
                 }
+            } catch (e: CancellationException) {
+                // Coroutine was cancelled - this is expected, don't log as error
+                Timber.d("Marker image loading cancelled for ${attraction.name}")
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load marker image for ${attraction.name}")
             }

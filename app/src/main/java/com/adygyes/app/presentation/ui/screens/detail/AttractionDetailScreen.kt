@@ -41,9 +41,12 @@ import com.adygyes.app.domain.model.Attraction
 import com.adygyes.app.domain.model.ReviewSortOption
 import com.adygyes.app.presentation.theme.Dimensions
 import com.adygyes.app.presentation.ui.components.*
+import com.adygyes.app.presentation.ui.components.auth.AuthModal
 import com.adygyes.app.presentation.ui.components.reviews.ReviewSection
 import com.adygyes.app.presentation.ui.components.reviews.WriteReviewModal
 import com.adygyes.app.presentation.viewmodel.AttractionDetailViewModel
+import com.adygyes.app.presentation.viewmodel.AuthEvent
+import com.adygyes.app.presentation.viewmodel.AuthViewModel
 import com.adygyes.app.presentation.viewmodel.ReviewViewModel
 
 /**
@@ -58,31 +61,81 @@ fun AttractionDetailScreen(
     onShareClick: () -> Unit,
     onShowOnMap: (() -> Unit)? = null,
     viewModel: AttractionDetailViewModel = hiltViewModel(),
-    reviewViewModel: ReviewViewModel = hiltViewModel()
+    reviewViewModel: ReviewViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showPhotoViewer by remember { mutableStateOf(false) }
     var selectedPhotoIndex by remember { mutableIntStateOf(0) }
     var showWriteReviewModal by remember { mutableStateOf(false) }
+    var showAuthModal by remember { mutableStateOf(false) }
     
     // Review states
     val reviews by reviewViewModel.reviews.collectAsStateWithLifecycle()
+    val userOwnReviews by reviewViewModel.userOwnReviews.collectAsStateWithLifecycle()
     val reviewsLoading by reviewViewModel.loading.collectAsStateWithLifecycle()
     val reviewSortBy by reviewViewModel.sortBy.collectAsStateWithLifecycle()
     val submitting by reviewViewModel.submitting.collectAsStateWithLifecycle()
     val errorMessage by reviewViewModel.error.collectAsStateWithLifecycle()
     val submitSuccess by reviewViewModel.submitSuccess.collectAsStateWithLifecycle()
+    val showAuthRequired by reviewViewModel.showAuthRequired.collectAsStateWithLifecycle()
+    
+    // Auth states
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val isAuthenticated by reviewViewModel.isAuthenticated.collectAsStateWithLifecycle()
+    
+    val context = LocalContext.current
+    
+    // Show auth modal when auth is required for review
+    LaunchedEffect(showAuthRequired) {
+        if (showAuthRequired) {
+            showAuthModal = true
+            reviewViewModel.dismissAuthRequired()
+        }
+    }
+    
+    // Handle auth events
+    LaunchedEffect(Unit) {
+        authViewModel.events.collect { event ->
+            when (event) {
+                is AuthEvent.SignInSuccess -> {
+                    showAuthModal = false
+                    // User is now authenticated, show write review modal
+                    showWriteReviewModal = true
+                }
+                is AuthEvent.SignUpSuccess -> {
+                    showAuthModal = false
+                    showWriteReviewModal = true
+                }
+                is AuthEvent.SignUpNeedsConfirmation -> {
+                    showAuthModal = false
+                    android.widget.Toast.makeText(
+                        context, 
+                        "Письмо для подтверждения отправлено на ${event.email}", 
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                else -> {}
+            }
+        }
+    }
     
     LaunchedEffect(attractionId) {
         viewModel.loadAttraction(attractionId)
         reviewViewModel.loadReviews(attractionId)
     }
     
-    // Close modal on successful submit
+    // Close modal on successful submit and show success message
     LaunchedEffect(submitSuccess) {
         if (submitSuccess) {
             showWriteReviewModal = false
             reviewViewModel.resetSubmitSuccess()
+            // Show success toast
+            android.widget.Toast.makeText(
+                context, 
+                "Отзыв отправлен на модерацию", 
+                android.widget.Toast.LENGTH_LONG
+            ).show()
         }
     }
     
@@ -399,11 +452,18 @@ fun AttractionDetailScreen(
                             averageRating = attraction.rating ?: 0f,
                             totalReviews = state.reviewCount,
                             reviews = reviews,
+                            userOwnReviews = userOwnReviews,
                             sortBy = reviewSortBy,
                             onSortChange = { reviewViewModel.setSortBy(it) },
-                            onWriteReview = { showWriteReviewModal = true },
-                            onLike = { reviewViewModel.likeReview(it) },
-                            onDislike = { reviewViewModel.dislikeReview(it) },
+                            onWriteReview = { 
+                                // Check if user can write review (auth check)
+                                if (reviewViewModel.canWriteReview()) {
+                                    showWriteReviewModal = true
+                                }
+                                // If not authenticated, showAuthRequired will trigger AuthModal
+                            },
+                            onLike = { reviewViewModel.reactToReview(it, true) },
+                            onDislike = { reviewViewModel.reactToReview(it, false) },
                             onShare = { /* TODO: Share review */ },
                             loading = reviewsLoading
                         )
@@ -434,6 +494,27 @@ fun AttractionDetailScreen(
                 attractionName = attraction.name,
                 submitting = submitting,
                 errorMessage = errorMessage
+            )
+            
+            // Auth Modal for review
+            AuthModal(
+                visible = showAuthModal,
+                onClose = { 
+                    showAuthModal = false
+                    authViewModel.clearError()
+                },
+                onSignIn = { email, password -> 
+                    authViewModel.signIn(email, password) 
+                },
+                onSignUp = { email, password, displayName -> 
+                    authViewModel.signUp(email, password, displayName) 
+                },
+                onForgotPassword = { email -> 
+                    authViewModel.resetPassword(email) 
+                },
+                isLoading = authUiState.isLoading,
+                errorMessage = authUiState.error,
+                onClearError = { authViewModel.clearError() }
             )
         }
     }

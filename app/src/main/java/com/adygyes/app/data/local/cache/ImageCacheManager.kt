@@ -134,6 +134,10 @@ class ImageCacheManager @Inject constructor(
                 Timber.w("⚠️ Failed to preload: ${url.substringAfterLast('/')}")
                 false
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Coroutine cancelled - don't log as error
+            Timber.d("Image preload cancelled: ${url.substringAfterLast('/')}")
+            throw e // Re-throw to propagate cancellation
         } catch (e: Exception) {
             Timber.e(e, "Error preloading image: $url")
             false

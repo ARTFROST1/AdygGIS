@@ -160,6 +160,13 @@ fun MapScreen(
         )
     )
     
+    // Request location permissions on first launch
+    LaunchedEffect(Unit) {
+        if (!locationPermissionsState.allPermissionsGranted) {
+            locationPermissionsState.launchMultiplePermissionRequest()
+        }
+    }
+    
     val focusManager = LocalFocusManager.current
     
     // Determine if we should intercept back press

@@ -23,6 +23,7 @@ fun ReviewSection(
     averageRating: Float,
     totalReviews: Int,
     reviews: List<Review>,
+    userOwnReviews: List<Review>,
     sortBy: ReviewSortOption,
     onSortChange: (ReviewSortOption) -> Unit,
     onWriteReview: () -> Unit,
@@ -56,7 +57,46 @@ fun ReviewSection(
         
         Spacer(modifier = Modifier.height(Dimensions.PaddingLarge))
         
-        // Reviews List Header
+        // User's Own Reviews Section
+        if (userOwnReviews.isNotEmpty()) {
+            Text(
+                text = "Ваш отзыв",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge, vertical = Dimensions.PaddingMedium)
+            )
+            
+            Column(
+                modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge),
+                verticalArrangement = Arrangement.spacedBy(Dimensions.PaddingMedium)
+            ) {
+                userOwnReviews.forEach { review ->
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        StatusBadge(status = review.status ?: "pending")
+                        ReviewCard(
+                            review = review,
+                            onLike = onLike,
+                            onDislike = onDislike,
+                            onShare = onShare
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(Dimensions.PaddingLarge))
+            
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            
+            Spacer(modifier = Modifier.height(Dimensions.PaddingLarge))
+        }
+        
+        // Public Reviews List Header
         if (reviews.isNotEmpty()) {
             Row(
                 modifier = Modifier
@@ -66,7 +106,11 @@ fun ReviewSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${reviews.size} отзывов",
+                    text = if (userOwnReviews.isNotEmpty()) {
+                        "Отзывы других пользователей"
+                    } else {
+                        "${reviews.size} отзывов"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface

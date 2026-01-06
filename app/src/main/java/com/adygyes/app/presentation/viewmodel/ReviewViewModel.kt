@@ -2,14 +2,20 @@ package com.adygyes.app.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.adygyes.app.data.repository.AuthRepository
 import com.adygyes.app.data.repository.ReviewRepository
+import com.adygyes.app.domain.model.AuthState
 import com.adygyes.app.domain.model.Review
 import com.adygyes.app.domain.model.ReviewSortOption
 import com.adygyes.app.domain.model.ReviewSubmission
+import com.adygyes.app.domain.model.isAuthenticated
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -20,11 +26,16 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ReviewViewModel @Inject constructor(
-    private val reviewRepository: ReviewRepository
+    private val reviewRepository: ReviewRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
     
     private val _reviews = MutableStateFlow<List<Review>>(emptyList())
     val reviews: StateFlow<List<Review>> = _reviews.asStateFlow()
+    
+    // User's own reviews (all statuses: pending, approved, rejected)
+    private val _userOwnReviews = MutableStateFlow<List<Review>>(emptyList())
+    val userOwnReviews: StateFlow<List<Review>> = _userOwnReviews.asStateFlow()
     
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
@@ -40,6 +51,19 @@ class ReviewViewModel @Inject constructor(
     
     private val _submitSuccess = MutableStateFlow(false)
     val submitSuccess: StateFlow<Boolean> = _submitSuccess.asStateFlow()
+    
+    // Auth state for checking if user can submit reviews
+    val isAuthenticated: StateFlow<Boolean> = authRepository.authState
+        .map { it.isAuthenticated }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    
+    // Check if user needs to login to submit review
+    private val _showAuthRequired = MutableStateFlow(false)
+    val showAuthRequired: StateFlow<Boolean> = _showAuthRequired.asStateFlow()
+    
+    // Check if user already reviewed this attraction
+    private val _hasUserReviewed = MutableStateFlow(false)
+    val hasUserReviewed: StateFlow<Boolean> = _hasUserReviewed.asStateFlow()
     
     private var currentAttractionId: String? = null
     
@@ -58,19 +82,68 @@ class ReviewViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                // Always refresh from remote first (approved-only)
+                // Check if user already reviewed this attraction
+                checkUserReviewed(attractionId)
+                
+                // If authenticated, load user's own reviews first
+                if (isAuthenticated.value) {
+                    reviewRepository.refreshUserOwnReviews(attractionId)
+                    _userOwnReviews.value = reviewRepository.userOwnReviews.value
+                } else {
+                    _userOwnReviews.value = emptyList()
+                }
+                
+                // Always refresh from remote (approved public reviews)
                 reviewRepository.refreshApprovedReviews(attractionId)
                 reviewRepository.getReviewsForAttraction(attractionId, _sortBy.value)
-                    .collect { reviewList ->
-                        _reviews.value = reviewList
+                    .collect { allReviews ->
+                        // Filter out user's own reviews to avoid duplicates
+                        val userReviewIds = _userOwnReviews.value.map { it.id }.toSet()
+                        _reviews.value = allReviews.filter { it.id !in userReviewIds }
                         _loading.value = false
                     }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Coroutine cancelled - don't log as error
+                Timber.d("Review loading cancelled for attraction $attractionId")
+                _loading.value = false
+                throw e // Re-throw to propagate cancellation
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load reviews for attraction $attractionId")
                 _error.value = e.message
                 _loading.value = false
             }
         }
+    }
+    
+    /**
+     * Check if user already reviewed this attraction
+     */
+    private suspend fun checkUserReviewed(attractionId: String) {
+        _hasUserReviewed.value = reviewRepository.hasUserReviewed(attractionId)
+    }
+    
+    /**
+     * Check if user can write a review (authenticated and hasn't reviewed yet)
+     * Uses synchronous check from AuthRepository for immediate validation
+     */
+    fun canWriteReview(): Boolean {
+        // Use synchronous check instead of StateFlow to avoid timing issues
+        if (!authRepository.isCurrentlyAuthenticated()) {
+            _showAuthRequired.value = true
+            return false
+        }
+        if (_hasUserReviewed.value) {
+            _error.value = "Вы уже оставили отзыв для этого места"
+            return false
+        }
+        return true
+    }
+    
+    /**
+     * Dismiss auth required prompt
+     */
+    fun dismissAuthRequired() {
+        _showAuthRequired.value = false
     }
     
     /**
@@ -82,39 +155,33 @@ class ReviewViewModel @Inject constructor(
     }
     
     /**
-     * Like a review
+     * React to a review (like/dislike with toggle logic)
      */
-    fun likeReview(reviewId: String) {
-        viewModelScope.launch {
-            try {
-                reviewRepository.updateReaction(reviewId, isLike = true)
-                    .onSuccess {
-                        Timber.d("Successfully liked review $reviewId")
-                    }
-                    .onFailure { e ->
-                        Timber.e(e, "Failed to like review $reviewId")
-                    }
-            } catch (e: Exception) {
-                Timber.e(e, "Error liking review $reviewId")
-            }
+    fun reactToReview(reviewId: String, isLike: Boolean) {
+        if (!authRepository.isCurrentlyAuthenticated()) {
+            _error.value = "Требуется авторизация"
+            return
         }
-    }
-    
-    /**
-     * Dislike a review
-     */
-    fun dislikeReview(reviewId: String) {
+        
         viewModelScope.launch {
             try {
-                reviewRepository.updateReaction(reviewId, isLike = false)
-                    .onSuccess {
-                        Timber.d("Successfully disliked review $reviewId")
+                val result = reviewRepository.reactToReview(reviewId, isLike)
+                when (result) {
+                    is com.adygyes.app.data.remote.NetworkResult.Success -> {
+                        Timber.d("Successfully reacted to review $reviewId")
+                        // Refresh both public reviews and user's own reviews to get updated counts
+                        currentAttractionId?.let { attractionId ->
+                            loadReviews(attractionId, forceRefresh = true)
+                        }
                     }
-                    .onFailure { e ->
-                        Timber.e(e, "Failed to dislike review $reviewId")
+                    is com.adygyes.app.data.remote.NetworkResult.Error -> {
+                        Timber.e("Failed to react to review: ${result.message}")
+                        _error.value = result.message
                     }
+                }
             } catch (e: Exception) {
-                Timber.e(e, "Error disliking review $reviewId")
+                Timber.e(e, "Error reacting to review $reviewId")
+                _error.value = e.message
             }
         }
     }
@@ -163,10 +230,18 @@ class ReviewViewModel @Inject constructor(
     }
     
     /**
+     * Clear error state
+     */
+    fun clearError() {
+        _error.value = null
+    }
+    
+    /**
      * Clear reviews (e.g., when navigating away)
      */
     fun clearReviews() {
         _reviews.value = emptyList()
+        _hasUserReviewed.value = false
         currentAttractionId = null
     }
 }

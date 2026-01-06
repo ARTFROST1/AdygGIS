@@ -25,16 +25,26 @@ data class ReviewDto(
     val title: String? = null,
 
     @SerialName("body")
-    val body: String,
+    val body: String? = null,
 
     @SerialName("status")
     val status: String? = null,
+    
+    @SerialName("rejection_reason")
+    val rejectionReason: String? = null,
 
     @SerialName("created_at")
     val createdAt: String? = null,
 
     @SerialName("updated_at")
     val updatedAt: String? = null,
+
+    // Reaction counts (added in review reactions migration)
+    @SerialName("likes_count")
+    val likesCount: Int? = 0,
+    
+    @SerialName("dislikes_count")
+    val dislikesCount: Int? = 0,
 
     // Joined profile (public read allowed by RLS)
     @SerialName("profiles")

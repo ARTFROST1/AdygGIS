@@ -59,18 +59,24 @@ object NetworkModule {
     @SupabaseInterceptor
     fun provideSupabaseInterceptor(): Interceptor = Interceptor { chain ->
         val originalRequest = chain.request()
-        
-        val newRequest = originalRequest.newBuilder()
+
+        val builder = originalRequest.newBuilder()
             .header(SupabaseConfig.Headers.API_KEY, SupabaseConfig.ANON_KEY)
-            .header(
-                SupabaseConfig.Headers.AUTHORIZATION,
-                "${SupabaseConfig.HeaderValues.BEARER_PREFIX}${SupabaseConfig.ANON_KEY}"
-            )
             .header(
                 SupabaseConfig.Headers.CONTENT_TYPE,
                 SupabaseConfig.HeaderValues.APPLICATION_JSON
             )
-            .build()
+
+        val hasAuthorization = originalRequest.header(SupabaseConfig.Headers.AUTHORIZATION)
+            ?.isNotBlank() == true
+        if (!hasAuthorization) {
+            builder.header(
+                SupabaseConfig.Headers.AUTHORIZATION,
+                "${SupabaseConfig.HeaderValues.BEARER_PREFIX}${SupabaseConfig.ANON_KEY}"
+            )
+        }
+
+        val newRequest = builder.build()
         
         chain.proceed(newRequest)
     }
@@ -103,9 +109,9 @@ object NetworkModule {
         return OkHttpClient.Builder()
             .addInterceptor(supabaseInterceptor)
             .addInterceptor(loggingInterceptor)
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS) // Reduce from 30s to 10s for tombstones timeout
+            .writeTimeout(15, TimeUnit.SECONDS)
             .build()
     }
     
