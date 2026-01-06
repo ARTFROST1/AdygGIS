@@ -301,6 +301,16 @@ class PreferencesManager @Inject constructor(
     }
 
     /**
+     * Clear last sync timestamp (ISO 8601 string) for Supabase delta sync.
+     * After clearing, delta sync will behave like first sync until a new timestamp is written.
+     */
+    suspend fun clearLastSyncTimestamp() {
+        dataStore.edit { preferences ->
+            preferences.remove(KEY_LAST_SYNC_TIMESTAMP)
+        }
+    }
+
+    /**
      * Update map camera state
      */
     suspend fun updateCameraState(

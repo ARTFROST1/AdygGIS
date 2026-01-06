@@ -25,7 +25,9 @@ class SettingsViewModel @Inject constructor(
     private val cacheManager: CacheManager,
     private val localeManager: LocaleManager,
     private val dataSyncUseCase: DataSyncUseCase,
-    private val networkUseCase: NetworkUseCase
+    private val networkUseCase: NetworkUseCase,
+    private val imageCacheManager: com.adygyes.app.data.local.cache.ImageCacheManager,
+    private val attractionDao: com.adygyes.app.data.local.dao.AttractionDao
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -38,10 +40,20 @@ class SettingsViewModel @Inject constructor(
     private val _syncInfo = MutableStateFlow<SyncInfo?>(null)
     val syncInfo: StateFlow<SyncInfo?> = _syncInfo.asStateFlow()
     
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+    
+    private val _isClearing = MutableStateFlow(false)
+    val isClearing: StateFlow<Boolean> = _isClearing.asStateFlow()
+    
+    private val _lastSyncTimestamp = MutableStateFlow<String?>(null)
+    val lastSyncTimestamp: StateFlow<String?> = _lastSyncTimestamp.asStateFlow()
+    
     init {
         loadSettings()
         loadSyncInfo()
         observeNetworkStatus()
+        loadLastSyncTimestamp()
     }
     
     private fun loadSettings() {
@@ -120,13 +132,20 @@ class SettingsViewModel @Inject constructor(
     
     fun syncData() {
         viewModelScope.launch {
-            dataSyncUseCase.syncData().collect { progress ->
-                _syncProgress.value = progress
-                
-                // Update sync info when completed
-                if (progress is SyncProgress.Completed || progress is SyncProgress.Error) {
-                    loadSyncInfo()
+            if (_isSyncing.value) return@launch
+            _isSyncing.value = true
+            try {
+                dataSyncUseCase.syncData().collect { progress ->
+                    _syncProgress.value = progress
+
+                    // Update sync info when completed
+                    if (progress is SyncProgress.Completed || progress is SyncProgress.Error) {
+                        loadSyncInfo()
+                        loadLastSyncTimestamp()
+                    }
                 }
+            } finally {
+                _isSyncing.value = false
             }
         }
     }
@@ -145,19 +164,85 @@ class SettingsViewModel @Inject constructor(
     
     fun forceRefresh() {
         viewModelScope.launch {
+            if (_isSyncing.value) return@launch
+            _isSyncing.value = true
             _syncProgress.value = SyncProgress.Started
-            val success = dataSyncUseCase.forceRefresh()
-            _syncProgress.value = if (success) {
-                SyncProgress.Completed("Data refreshed successfully")
-            } else {
-                SyncProgress.Error("Failed to refresh data")
+            try {
+                val success = dataSyncUseCase.forceRefresh()
+                _syncProgress.value = if (success) {
+                    SyncProgress.Completed("Data refreshed successfully")
+                } else {
+                    SyncProgress.Error("Failed to refresh data")
+                }
+                loadSyncInfo()
+                loadLastSyncTimestamp()
+            } finally {
+                _isSyncing.value = false
             }
-            loadSyncInfo()
         }
     }
     
     fun clearSyncProgress() {
         _syncProgress.value = null
+    }
+    
+    private fun loadLastSyncTimestamp() {
+        viewModelScope.launch {
+            val timestamp = preferencesManager.getLastSyncTimestamp()
+            _lastSyncTimestamp.value = timestamp
+        }
+    }
+    
+    /**
+     * Perform delta sync with Supabase
+     * Получает только изменения с момента последней синхронизации
+     */
+    fun performSync() {
+        syncData()
+    }
+    
+    /**
+     * Clear all cache (Room + images + sync timestamps).
+     * User needs to manually sync or restart app to reload data.
+     * Очищает все данные. Для загрузки нужно вручную синхронизировать или перезапустить приложение.
+     */
+    fun clearCache() {
+        viewModelScope.launch {
+            try {
+                _isClearing.value = true
+                
+                timber.log.Timber.d("🗑️ Starting cache clear...")
+                
+                // 1. Clear Room database
+                timber.log.Timber.d("🗑️ Clearing Room database...")
+                attractionDao.deleteAll()
+                
+                // 2. Clear image caches (memory + disk)
+                timber.log.Timber.d("🗑️ Clearing image caches...")
+                imageCacheManager.clearAllCache()
+                
+                // 3. Clear preferences (reset sync timestamp)
+                timber.log.Timber.d("🗑️ Resetting sync timestamp...")
+                cacheManager.clearAllCache()
+                
+                loadSyncInfo()
+                loadLastSyncTimestamp()
+                timber.log.Timber.d("✅ Cache cleared successfully")
+            } catch (e: Exception) {
+                timber.log.Timber.e(e, "❌ Failed to clear cache")
+            } finally {
+                _isClearing.value = false
+            }
+        }
+    }
+    
+    /**
+     * Get cache size info for display
+     */
+    suspend fun getCacheSize(): String {
+        val cacheInfo = imageCacheManager.getCacheInfo()
+        val totalSizeMB = (cacheInfo.diskSizeBytes + cacheInfo.memorySizeBytes) / (1024f * 1024f)
+        return String.format("%.1f МБ", totalSizeMB)
     }
     
     /**

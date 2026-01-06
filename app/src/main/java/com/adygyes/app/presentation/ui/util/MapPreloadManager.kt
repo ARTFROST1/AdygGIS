@@ -233,6 +233,7 @@ class MapPreloadManager @Inject constructor(
     
     /**
      * Launch background sync with Supabase (non-blocking)
+     * Uses incremental marker updates to avoid full reload and flickering
      */
     private fun launchBackgroundSync(mapView: MapView) {
         scope.launch {
@@ -249,15 +250,40 @@ class MapPreloadManager @Inject constructor(
                 if (syncResult.success && (syncResult.added > 0 || syncResult.updated > 0 || syncResult.deleted > 0)) {
                     Timber.d("📡 Background sync found changes: +${syncResult.added} ~${syncResult.updated} -${syncResult.deleted}")
                     
-                    // Reload and update markers
+                    // Reload fresh data from Room
                     val freshAttractions = withContext(Dispatchers.IO) {
                         repository.getAllAttractions().first()
                     }
                     
                     if (freshAttractions != _attractions.value) {
+                        val previousAttractions = _attractions.value
+                        val previousById = previousAttractions.associateBy { it.id }
+
+                        // Preload images for NEW/UPDATED attractions first, so marker icon updates hit cache.
+                        val changedOrNewImageUrls = freshAttractions
+                            .asSequence()
+                            .filter { attraction ->
+                                val old = previousById[attraction.id]
+                                old == null || old.images != attraction.images
+                            }
+                            .mapNotNull { it.images.firstOrNull() }
+                            .distinct()
+                            .toList()
+
+                        if (changedOrNewImageUrls.isNotEmpty()) {
+                            withContext(Dispatchers.IO) {
+                                imageCacheManager.preloadImages(changedOrNewImageUrls)
+                            }
+                            Timber.d("📷 Preloaded ${changedOrNewImageUrls.size} new/updated images")
+                        }
+
+                        // Apply marker updates only after data + relevant images are ready.
+                        withContext(Dispatchers.Main) {
+                            visualMarkerProvider?.updateVisualMarkers(freshAttractions)
+                        }
+
                         _attractions.value = freshAttractions
-                        createMarkersForAttractions(mapView, freshAttractions)
-                        Timber.d("✅ Markers updated with new data")
+                        Timber.d("✅ Markers updated after background sync (incremental, no flickering)")
                     }
                 } else {
                     Timber.d("📡 Background sync: no changes")

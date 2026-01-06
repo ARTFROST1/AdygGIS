@@ -79,6 +79,14 @@ class MapViewModel @Inject constructor(
     private val _viewMode = MutableStateFlow(ViewMode.MAP)
     val viewMode: StateFlow<ViewMode> = _viewMode.asStateFlow()
     
+    // Category carousel visibility state (preserved across navigation)
+    private val _showCategoryCarousel = MutableStateFlow(false)
+    val showCategoryCarousel: StateFlow<Boolean> = _showCategoryCarousel.asStateFlow()
+    
+    // Search field focus state (preserved across navigation)
+    private val _isSearchFieldFocused = MutableStateFlow(false)
+    val isSearchFieldFocused: StateFlow<Boolean> = _isSearchFieldFocused.asStateFlow()
+    
     // Search panel state
     private val _showSearchPanel = MutableStateFlow(false)
     val showSearchPanel: StateFlow<Boolean> = _showSearchPanel.asStateFlow()
@@ -795,12 +803,13 @@ class MapViewModel @Inject constructor(
     
     fun clearSelection() {
         Timber.d("Clearing attraction selection")
+        val wasSelectedFromPanel = _selectedFromPanel.value
         _selectedAttraction.value = null
         _selectedFromPanel.value = false
         _uiState.update { it.copy(showAttractionDetail = false) }
         
         // If we selected from panel, show panel again when bottom sheet closes
-        if (_selectedFromPanel.value && _searchQuery.value.isNotEmpty()) {
+        if (wasSelectedFromPanel && _searchQuery.value.isNotEmpty()) {
             _showSearchPanel.value = true
         }
     }
@@ -927,6 +936,34 @@ class MapViewModel @Inject constructor(
             ViewMode.MAP -> ViewMode.LIST
             ViewMode.LIST -> ViewMode.MAP
         }
+        // Auto-show carousel when switching to LIST mode
+        if (_viewMode.value == ViewMode.LIST) {
+            _showCategoryCarousel.value = true
+        }
+    }
+    
+    /**
+     * Toggle category carousel visibility
+     */
+    fun toggleCategoryCarousel() {
+        _showCategoryCarousel.value = !_showCategoryCarousel.value
+        Timber.d("🎠 Category carousel toggled: ${_showCategoryCarousel.value}")
+    }
+    
+    /**
+     * Set category carousel visibility
+     */
+    fun setCategoryCarouselVisibility(visible: Boolean) {
+        _showCategoryCarousel.value = visible
+        Timber.d("🎠 Category carousel visibility set to: $visible")
+    }
+    
+    /**
+     * Set search field focus state (preserved across navigation)
+     */
+    fun setSearchFieldFocused(focused: Boolean) {
+        _isSearchFieldFocused.value = focused
+        Timber.d("🔍 Search field focused: $focused")
     }
     
     fun clearLocationError() {

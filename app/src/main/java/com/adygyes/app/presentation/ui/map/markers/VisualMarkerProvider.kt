@@ -169,6 +169,7 @@ class VisualMarkerProvider(
      */
     fun updateVisualMarkers(attractions: List<Attraction>) {
         val desiredIds = attractions.map { it.id }.toSet()
+        val desiredById = attractions.associateBy { it.id }
 
         Timber.d("🎯 FILTER: updateVisualMarkers called with ${attractions.size} attractions")
         Timber.d("🎯 FILTER: Current markers: ${markers.keys.joinToString(", ")}")
@@ -193,6 +194,36 @@ class VisualMarkerProvider(
             if (!currentIds.contains(attraction.id)) {
                 addVisualMarker(attraction, animated = false)
                 Timber.d("➕ FILTER: Added marker for: ${attraction.name} (id: ${attraction.id})")
+            }
+        }
+
+        // Update existing markers in-place when underlying data changed.
+        // This avoids full clear+recreate while still reflecting coordinate/photo updates.
+        (desiredIds intersect currentIds).forEach { id ->
+            val placemark = markers[id] ?: return@forEach
+            val newAttraction = desiredById[id] ?: return@forEach
+            val oldAttraction = placemark.userData as? Attraction
+
+            // Always refresh userData so selection updates use the newest fields/images.
+            placemark.userData = newAttraction
+
+            // Update geometry if coordinates changed.
+            val newPoint = Point(newAttraction.location.latitude, newAttraction.location.longitude)
+            if (placemark.geometry != newPoint) {
+                placemark.geometry = newPoint
+                Timber.d("📍 FILTER: Updated marker position for id=$id")
+            }
+
+            // If marker visuals might change (image/category), invalidate cached icons and set a fresh icon.
+            val shouldInvalidateIcon = oldAttraction == null ||
+                oldAttraction.images != newAttraction.images ||
+                oldAttraction.category != newAttraction.category
+
+            if (shouldInvalidateIcon) {
+                markerImages.remove("${id}_normal")
+                markerImages.remove("${id}_selected")
+                placemark.setIcon(getOrCreateImageProvider(newAttraction, isSelected = false))
+                Timber.d("🖼️ FILTER: Refreshed marker icon for id=$id")
             }
         }
 

@@ -120,12 +120,12 @@ fun MapScreen(
     val searchPanelHasKeyboard by viewModel.searchPanelHasKeyboard.collectAsStateWithLifecycle()
     val selectedFromPanel by viewModel.selectedFromPanel.collectAsStateWithLifecycle()
     
-    // UI State
-    // Unified state for category carousel - always visible in LIST mode, toggleable in MAP mode
-    var showCategoryCarousel by remember { mutableStateOf(false) }
+    // UI State - now from ViewModel to persist across navigation
+    // Category carousel visibility - always visible in LIST mode, toggleable in MAP mode
+    val showCategoryCarousel by viewModel.showCategoryCarousel.collectAsStateWithLifecycle()
     
-    // Search field focus state for expandable search
-    var isSearchFieldFocused by remember { mutableStateOf(false) }
+    // Search field focus state for expandable search - persists across navigation
+    val isSearchFieldFocused by viewModel.isSearchFieldFocused.collectAsStateWithLifecycle()
     
     // Keyboard controller for managing keyboard state
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -137,14 +137,15 @@ fun MapScreen(
     LaunchedEffect(isKeyboardVisible) {
         viewModel.setSearchPanelKeyboardState(isKeyboardVisible)
     }
-    
-    // Auto-show carousel in LIST mode
+
+    // Ensure carousel is visible in LIST mode (even if viewMode is set outside toggleViewMode)
     LaunchedEffect(viewMode) {
-        if (viewMode == ViewMode.LIST) {
-            showCategoryCarousel = true
+        if (viewMode == ViewMode.LIST && !showCategoryCarousel) {
+            viewModel.setCategoryCarouselVisibility(true)
         }
-        // Keep previous state when switching to MAP mode
     }
+    
+    // Auto-show carousel in LIST mode is now handled in ViewModel.toggleViewMode()
     
     var searchJob by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
@@ -195,12 +196,13 @@ fun MapScreen(
                 Timber.d("🔙 Back pressed: clearing search focus")
                 focusManager.clearFocus()
                 keyboardController?.hide()
-                isSearchFieldFocused = false
+                viewModel.setSearchFieldFocused(false)
+                viewModel.onSearchFieldFocusChanged(false)
             }
             // Priority 4: Hide category carousel in MAP mode if visible
             showCategoryCarousel && viewMode == ViewMode.MAP -> {
                 Timber.d("🔙 Back pressed: hiding category carousel")
-                showCategoryCarousel = false
+                viewModel.setCategoryCarouselVisibility(false)
             }
             // Priority 5: Switch from LIST to MAP mode
             viewMode == ViewMode.LIST -> {
@@ -600,8 +602,11 @@ fun MapScreen(
                                     viewMode = listViewMode,
                                     onViewModeToggle = { viewModel.toggleListViewMode() },
                                     isExpanded = true,
-                                    onFocusChange = { focused -> isSearchFieldFocused = focused },
-                                    onCloseClick = { isSearchFieldFocused = false },
+                                    onFocusChange = { focused -> viewModel.setSearchFieldFocused(focused) },
+                                    onCloseClick = {
+                                        viewModel.setSearchFieldFocused(false)
+                                        viewModel.onSearchFieldFocusChanged(false)
+                                    },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .fillMaxHeight()
@@ -620,7 +625,8 @@ fun MapScreen(
                                     },
                                     placeholder = stringResource(R.string.search_attractions),
                                     onCloseClick = { 
-                                        isSearchFieldFocused = false
+                                        viewModel.setSearchFieldFocused(false)
+                                        viewModel.onSearchFieldFocusChanged(false)
                                         keyboardController?.hide()
                                         isKeyboardVisible = false
                                         viewModel.clearSearchQuery() // Use new method to clear and hide
@@ -632,7 +638,7 @@ fun MapScreen(
                                         }
                                     },
                                     onFocusChange = { focused -> 
-                                        isSearchFieldFocused = focused
+                                        viewModel.setSearchFieldFocused(focused)
                                         viewModel.onSearchFieldFocusChanged(focused)
                                         if (focused && viewMode == ViewMode.MAP) {
                                             isKeyboardVisible = true
@@ -669,7 +675,7 @@ fun MapScreen(
                                     viewMode = listViewMode,
                                     onViewModeToggle = { viewModel.toggleListViewMode() },
                                     isExpanded = false,
-                                    onFocusChange = { focused -> isSearchFieldFocused = focused },
+                                    onFocusChange = { focused -> viewModel.setSearchFieldFocused(focused) },
                                     onCloseClick = { },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -689,12 +695,12 @@ fun MapScreen(
                                     },
                                     placeholder = stringResource(R.string.search_attractions),
                                     onFilterClick = { 
-                                        showCategoryCarousel = !showCategoryCarousel
+                                        viewModel.toggleCategoryCarousel()
                                     },
                                     hasActiveFilters = selectedCategoryFilter !is MapViewModel.CategoryFilter.All,
                                     isCarouselVisible = showCategoryCarousel,
                                     onFocusChange = { focused -> 
-                                        isSearchFieldFocused = focused
+                                        viewModel.setSearchFieldFocused(focused)
                                         viewModel.onSearchFieldFocusChanged(focused)
                                         if (focused && viewMode == ViewMode.MAP) {
                                             isKeyboardVisible = true

@@ -324,7 +324,7 @@ fun main() {
 ## � Этап 7: Авторизация и Отзывы (Post-MVP)
 
 > **Примечание:** Этот этап добавляется после базовой Supabase интеграции.
-> См. полную документацию: [AdygGIS-RN/Docs/Extra/08_REVIEWS_AND_AUTH_MODULE.md](../../../AdygGIS-RN/Docs/Extra/08_REVIEWS_AND_AUTH_MODULE.md)
+> См. полную документацию: [AdygGIS-RN/Docs/Extra/Reviews/08_REVIEWS_AND_AUTH_MODULE.md](../../../AdygGIS-RN/Docs/Extra/Reviews/08_REVIEWS_AND_AUTH_MODULE.md)
 
 ### Auth Module
 
@@ -386,7 +386,7 @@ fun main() {
 | [03_RETROFIT_SUPABASE.md](03_RETROFIT_SUPABASE.md) | Retrofit интеграция |
 | [04_SYNC_SERVICE.md](04_SYNC_SERVICE.md) | Сервис синхронизации |
 | [05_UI_UNIFICATION.md](05_UI_UNIFICATION.md) | Унификация UI |
-| [../../../AdygGIS-RN/Docs/Extra/08_REVIEWS_AND_AUTH_MODULE.md](../../../AdygGIS-RN/Docs/Extra/08_REVIEWS_AND_AUTH_MODULE.md) | 🆕 Модуль отзывов и авторизации |
+| [../../../AdygGIS-RN/Docs/Extra/Reviews/08_REVIEWS_AND_AUTH_MODULE.md](../../../AdygGIS-RN/Docs/Extra/Reviews/08_REVIEWS_AND_AUTH_MODULE.md) | 🆕 Модуль отзывов и авторизации |
 | [../../../ECOSYSTEM.md](../../../ECOSYSTEM.md) | Обзор экосистемы |
 
 ---

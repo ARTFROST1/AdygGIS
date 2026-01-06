@@ -88,8 +88,11 @@ class CacheManager @Inject constructor(
      * Clear all cache
      */
     suspend fun clearAllCache() {
-        // Reset last sync time
+        // Reset legacy last sync time
         preferencesManager.updateLastSyncTime(0L)
+
+        // Reset Supabase delta sync timestamp
+        preferencesManager.clearLastSyncTimestamp()
         Timber.d("All cache cleared")
     }
     

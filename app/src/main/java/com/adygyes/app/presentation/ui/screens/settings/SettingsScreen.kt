@@ -54,6 +54,7 @@ fun SettingsScreen(
     var showRatingDialog by remember { mutableStateOf(false) }
     var showAuthModal by remember { mutableStateOf(false) }
     var showSignOutConfirm by remember { mutableStateOf(false) }
+    var showClearCacheConfirm by remember { mutableStateOf(false) }
     // Easter egg: 7 taps on title
     var tapCount by remember { mutableStateOf(0) }
     var lastTapTime by remember { mutableStateOf(0L) }
@@ -67,7 +68,11 @@ fun SettingsScreen(
             when (event) {
                 is AuthEvent.SignInSuccess -> {
                     showAuthModal = false
-                    Toast.makeText(context, "Добро пожаловать, ${event.user.displayName ?: event.user.email}!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Добро пожаловать, ${event.user.displayName ?: event.user.email}!",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
                 is AuthEvent.SignUpSuccess -> {
                     showAuthModal = false
@@ -75,19 +80,27 @@ fun SettingsScreen(
                 }
                 is AuthEvent.SignUpNeedsConfirmation -> {
                     showAuthModal = false
-                    Toast.makeText(context, "Письмо для подтверждения отправлено на ${event.email}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        context,
+                        "Письмо для подтверждения отправлено на ${event.email}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
                 is AuthEvent.SignOutSuccess -> {
                     Toast.makeText(context, "Вы вышли из аккаунта", Toast.LENGTH_SHORT).show()
                 }
                 is AuthEvent.PasswordResetSent -> {
                     showAuthModal = false
-                    Toast.makeText(context, "Письмо для сброса пароля отправлено на ${event.email}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        context,
+                        "Письмо для сброса пароля отправлено на ${event.email}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }
     }
-    
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -98,7 +111,6 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.clickable {
                             val now = System.currentTimeMillis()
-                            // Reset sequence if too slow between taps
                             if (now - lastTapTime > 1500) tapCount = 0
                             lastTapTime = now
                             tapCount += 1
@@ -116,11 +128,10 @@ fun SettingsScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = { 
+                        onClick = {
                             if (!isNavigating) {
                                 isNavigating = true
                                 onNavigateBack()
-                                // Reset flag after navigation completes (longer than animation)
                                 coroutineScope.launch {
                                     delay(500)
                                     isNavigating = false
@@ -265,6 +276,83 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(Dimensions.SpacingMedium))
             }
             
+            // Data & Storage Section
+            item {
+                SettingsSectionHeader(title = "Данные и хранилище")
+            }
+            
+            item {
+                val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+                val lastSyncTimestamp by viewModel.lastSyncTimestamp.collectAsStateWithLifecycle()
+                
+                val syncSubtitle = when {
+                    isSyncing -> "Синхронизация..."
+                    lastSyncTimestamp != null -> {
+                        try {
+                            val instant = java.time.Instant.parse(lastSyncTimestamp)
+                            val formatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+                                .withZone(java.time.ZoneId.systemDefault())
+                            "Последняя: ${formatter.format(instant)}"
+                        } catch (e: Exception) {
+                            "Последняя: не выполнялась"
+                        }
+                    }
+                    else -> "Последняя: не выполнялась"
+                }
+                
+                SettingsItem(
+                    icon = Icons.Default.Sync,
+                    title = "Синхронизировать данные",
+                    subtitle = syncSubtitle,
+                    onClick = {
+                        if (!isSyncing) {
+                            viewModel.performSync()
+                            Toast.makeText(context, "Синхронизация запущена", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = !isSyncing && uiState.isOnline
+                )
+            }
+            
+            item {
+                val isClearing by viewModel.isClearing.collectAsStateWithLifecycle()
+                var cacheSize by remember { mutableStateOf("...") }
+                
+                LaunchedEffect(Unit) {
+                    try {
+                        cacheSize = viewModel.getCacheSize()
+                    } catch (e: Exception) {
+                        cacheSize = "0.0 МБ"
+                    }
+                }
+
+                LaunchedEffect(isClearing) {
+                    if (!isClearing) {
+                        try {
+                            cacheSize = viewModel.getCacheSize()
+                        } catch (e: Exception) {
+                            cacheSize = "0.0 МБ"
+                        }
+                    }
+                }
+                
+                SettingsItem(
+                    icon = Icons.Default.DeleteOutline,
+                    title = "Очистить кэш",
+                    subtitle = if (isClearing) "Очистка..." else "Занято: $cacheSize",
+                    onClick = {
+                        if (!isClearing) {
+                            showClearCacheConfirm = true
+                        }
+                    },
+                    enabled = !isClearing && uiState.isOnline
+                )
+            }
+            
+            item {
+                Spacer(modifier = Modifier.height(Dimensions.SpacingMedium))
+            }
+            
             // About Section
             item {
                 SettingsSectionHeader(title = stringResource(R.string.settings_about))
@@ -335,6 +423,35 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(Dimensions.SpacingLarge))
             }
         }
+    }
+
+    if (showClearCacheConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearCacheConfirm = false },
+            title = { Text("Очистить кэш?") },
+            text = {
+                Text(
+                    "Это удалит все загруженные изображения и данные. " +
+                        "Для загрузки данных нажмите \"Синхронизировать\" или перезапустите приложение. Продолжить?"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearCacheConfirm = false
+                        viewModel.clearCache()
+                        Toast.makeText(
+                            context,
+                            "Кэш очищен. Нажмите \"Синхронизировать\" для загрузки данных.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                ) { Text("Очистить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCacheConfirm = false }) { Text("Отмена") }
+            }
+        )
     }
     
     // Language Selection Dialog

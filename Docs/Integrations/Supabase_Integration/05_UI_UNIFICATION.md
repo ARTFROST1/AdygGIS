@@ -428,7 +428,7 @@ export const CompactAttractionCard: FC<CompactAttractionCardProps> = ({
 Цель: Kotlin `AttractionDetailScreen` должен показывать **тот же блок отзывов**, что и RN (и считать те же агрегаты), при этом источником истины остаётся Supabase.
 
 **Source of truth (backend модуль):**
-- [AdygGIS-RN/Docs/Extra/08_REVIEWS_AND_AUTH_MODULE.md](../../../AdygGIS-RN/Docs/Extra/08_REVIEWS_AND_AUTH_MODULE.md)
+- [AdygGIS-RN/Docs/Extra/Reviews/08_REVIEWS_AND_AUTH_MODULE.md](../../../AdygGIS-RN/Docs/Extra/Reviews/08_REVIEWS_AND_AUTH_MODULE.md)
 
 ### Данные (что должно совпадать на 100%)
 
