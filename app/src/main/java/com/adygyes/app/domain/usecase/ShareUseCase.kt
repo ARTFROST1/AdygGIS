@@ -110,7 +110,7 @@ class ShareUseCase @Inject constructor(
                 appendLine("📍 Адрес: $address")
             }
             
-            attraction.rating?.let { rating ->
+            attraction.averageRating?.let { rating ->
                 appendLine("⭐ Рейтинг: $rating/5")
             }
             
@@ -165,7 +165,7 @@ class ShareUseCase @Inject constructor(
             attractions.forEachIndexed { index, attraction ->
                 appendLine("${index + 1}. ${attraction.name}")
                 appendLine("   📍 ${attraction.category.displayName}")
-                attraction.rating?.let { rating ->
+                attraction.averageRating?.let { rating ->
                     appendLine("   ⭐ $rating/5")
                 }
                 attraction.location.address?.let { address ->

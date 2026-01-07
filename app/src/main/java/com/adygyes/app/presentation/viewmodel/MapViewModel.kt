@@ -97,18 +97,9 @@ class MapViewModel @Inject constructor(
     private val _selectedFromPanel = MutableStateFlow(false)
     val selectedFromPanel: StateFlow<Boolean> = _selectedFromPanel.asStateFlow()
     
-    // Navigation source tracking for DetailScreen -> Map navigation
-    private val _selectedFromDetailScreen = MutableStateFlow(false)
-    val selectedFromDetailScreen: StateFlow<Boolean> = _selectedFromDetailScreen.asStateFlow()
-    
-    private val _returnToDetailAttractionId = MutableStateFlow<String?>(null)
-    val returnToDetailAttractionId: StateFlow<String?> = _returnToDetailAttractionId.asStateFlow()
-    
-    private val _shouldReturnToDetail = MutableStateFlow(false)
-    val shouldReturnToDetail: StateFlow<Boolean> = _shouldReturnToDetail.asStateFlow()
-    
-    private val _attractionIdToShowOnMap = MutableStateFlow<String?>(null)
-    val attractionIdToShowOnMap: StateFlow<String?> = _attractionIdToShowOnMap.asStateFlow()
+    // Track if attraction was opened from list view (for showing "Show on map" button)
+    private val _openedFromList = MutableStateFlow(false)
+    val openedFromList: StateFlow<Boolean> = _openedFromList.asStateFlow()
     
     val filteredAttractions: StateFlow<List<Attraction>> = combine(
         _attractions,
@@ -138,7 +129,7 @@ class MapViewModel @Inject constructor(
         filtered = when (sortBy) {
             SortBy.NAME -> filtered.sortedBy { it.name }
             SortBy.CATEGORY -> filtered.sortedBy { it.category.displayName }
-            SortBy.RATING -> filtered.sortedByDescending { it.rating ?: 0f }
+            SortBy.RATING -> filtered.sortedByDescending { it.averageRating ?: 0f }
             SortBy.DISTANCE -> {
                 // TODO: Implement distance sorting when user location is available
                 filtered
@@ -278,6 +269,37 @@ class MapViewModel @Inject constructor(
         _selectedAttraction.value = attraction
         _uiState.update { it.copy(showAttractionDetail = true) }
     }
+
+    fun selectAttractionById(attractionId: String, switchToMap: Boolean = false) {
+        val attraction = _attractions.value.find { it.id == attractionId }
+        if (attraction == null) {
+            Timber.w("Attraction not found by id: $attractionId")
+            return
+        }
+
+        // Track if opened from list view (not switching to map means staying in list mode)
+        _openedFromList.value = _viewMode.value == ViewMode.LIST && !switchToMap
+
+        if (switchToMap) {
+            _viewMode.value = ViewMode.MAP
+        }
+
+        selectAttraction(attraction)
+    }
+    
+    /**
+     * Show attraction on map - switch to map view and center on attraction
+     * Used when "Show on map" button is pressed in list view
+     */
+    fun showAttractionOnMap(attraction: Attraction, mapView: com.yandex.mapkit.mapview.MapView?) {
+        Timber.d("Showing attraction on map: ${attraction.name}")
+        // Switch to MAP view
+        _viewMode.value = ViewMode.MAP
+        // Update openedFromList since we're now in map mode
+        _openedFromList.value = false
+        // Center map on attraction
+        centerMapOnAttraction(attraction, mapView)
+    }
     
     /**
      * Handle attraction selection from search panel
@@ -294,27 +316,7 @@ class MapViewModel @Inject constructor(
         // Then show bottom sheet
         selectAttraction(attraction)
     }
-    
-    /**
-     * Handle attraction selection from DetailScreen "Show on Map" button
-     * This will open map, center on attraction, and should return to DetailScreen on close
-     */
-    fun selectAttractionFromDetailScreen(attraction: Attraction, mapView: com.yandex.mapkit.mapview.MapView?) {
-        Timber.d("Selecting attraction from DetailScreen: ${attraction.name}")
-        _selectedFromDetailScreen.value = true
-        _returnToDetailAttractionId.value = attraction.id
-        _shouldReturnToDetail.value = false // Reset flag, will be set on dismiss
-        
-        // Switch to map view
-        _viewMode.value = ViewMode.MAP
-        
-        // Center map on selected attraction
-        centerMapOnAttraction(attraction, mapView)
-        
-        // Then show bottom sheet
-        selectAttraction(attraction)
-    }
-    
+
     /**
      * Center map on specific attraction with animation
      */
@@ -454,36 +456,6 @@ class MapViewModel @Inject constructor(
             // Panel is already visible in half state, no need to restore
         }
         
-        // Check if we need to return to DetailScreen
-        if (_selectedFromDetailScreen.value) {
-            _selectedFromDetailScreen.value = false
-            // Trigger return to DetailScreen
-            _shouldReturnToDetail.value = true
-            Timber.d("📍 Bottom sheet closed, triggering return to DetailScreen")
-        }
-    }
-    
-    /**
-     * Clear the return to detail screen flag after navigation completed
-     */
-    fun clearReturnToDetail() {
-        _returnToDetailAttractionId.value = null
-        _shouldReturnToDetail.value = false
-    }
-    
-    /**
-     * Set attraction ID to show on map when navigating from DetailScreen
-     */
-    fun setAttractionToShowOnMap(attractionId: String) {
-        _attractionIdToShowOnMap.value = attractionId
-        Timber.d("📍 Set attraction to show on map: $attractionId")
-    }
-    
-    /**
-     * Clear attraction to show on map after displaying
-     */
-    fun clearAttractionToShowOnMap() {
-        _attractionIdToShowOnMap.value = null
     }
     
     fun filterByCategory(category: AttractionCategory?) {
@@ -806,6 +778,7 @@ class MapViewModel @Inject constructor(
         val wasSelectedFromPanel = _selectedFromPanel.value
         _selectedAttraction.value = null
         _selectedFromPanel.value = false
+        _openedFromList.value = false
         _uiState.update { it.copy(showAttractionDetail = false) }
         
         // If we selected from panel, show panel again when bottom sheet closes
@@ -904,6 +877,7 @@ class MapViewModel @Inject constructor(
      */
     fun onMarkerClick(attraction: Attraction) {
         Timber.d("✅ Marker clicked via overlay: ${attraction.name}")
+        _openedFromList.value = false // Marker click = opened from map
         selectAttraction(attraction)
     }
     

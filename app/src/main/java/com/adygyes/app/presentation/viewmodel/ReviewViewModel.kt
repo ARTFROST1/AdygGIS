@@ -71,8 +71,16 @@ class ReviewViewModel @Inject constructor(
      * Load reviews for an attraction
      */
     fun loadReviews(attractionId: String, forceRefresh: Boolean = false) {
+        // Не пропускаем загрузку если это forceRefresh или другая достопримечательность
         if (!forceRefresh && currentAttractionId == attractionId && _reviews.value.isNotEmpty()) {
-            // Already loaded
+            // Already loaded, но всё равно обновим userOwnReviews на всякий случай
+            if (isAuthenticated.value) {
+                viewModelScope.launch {
+                    reviewRepository.refreshUserOwnReviews(attractionId)
+                    _userOwnReviews.value = reviewRepository.userOwnReviews.value
+                    Timber.d("Refreshed user own reviews (cached path), count=${_userOwnReviews.value.size}")
+                }
+            }
             return
         }
         
@@ -85,19 +93,27 @@ class ReviewViewModel @Inject constructor(
                 // Check if user already reviewed this attraction
                 checkUserReviewed(attractionId)
                 
-                // If authenticated, load user's own reviews first
+                // CRITICAL: Load user's own reviews FIRST before public reviews
+                // This ensures proper filtering to avoid duplicates
                 if (isAuthenticated.value) {
                     reviewRepository.refreshUserOwnReviews(attractionId)
                     _userOwnReviews.value = reviewRepository.userOwnReviews.value
+                    Timber.d("Loaded user own reviews, count=${_userOwnReviews.value.size}, statuses=${_userOwnReviews.value.map { it.status }}")
                 } else {
                     _userOwnReviews.value = emptyList()
                 }
                 
+                // Get current user ID for filtering
+                val currentUserId = if (isAuthenticated.value) {
+                    reviewRepository.getCurrentUserId()
+                } else null
+                
                 // Always refresh from remote (approved public reviews)
-                reviewRepository.refreshApprovedReviews(attractionId)
+                // Pass userId to filter out user's own approved reviews from public list
+                reviewRepository.refreshApprovedReviews(attractionId, excludeUserId = currentUserId)
                 reviewRepository.getReviewsForAttraction(attractionId, _sortBy.value)
                     .collect { allReviews ->
-                        // Filter out user's own reviews to avoid duplicates
+                        // Additional safety: filter out user's own reviews to avoid duplicates
                         val userReviewIds = _userOwnReviews.value.map { it.id }.toSet()
                         _reviews.value = allReviews.filter { it.id !in userReviewIds }
                         _loading.value = false
@@ -170,6 +186,7 @@ class ReviewViewModel @Inject constructor(
                     is com.adygyes.app.data.remote.NetworkResult.Success -> {
                         Timber.d("Successfully reacted to review $reviewId")
                         // Refresh both public reviews and user's own reviews to get updated counts
+                        // forceRefresh=true ensures proper re-filtering
                         currentAttractionId?.let { attractionId ->
                             loadReviews(attractionId, forceRefresh = true)
                         }
@@ -204,10 +221,22 @@ class ReviewViewModel @Inject constructor(
                 
                 reviewRepository.submitReview(submission)
                     .onSuccess { newReview ->
-                        Timber.d("Successfully submitted review for attraction $attractionId")
+                        Timber.d("Successfully submitted review for attraction $attractionId, status=${newReview.status}")
+                        
+                        // КРИТИЧНО: обновить локальный стейт сразу с новым отзывом
+                        // Репозиторий уже добавил отзыв в свой кэш, копируем его
+                        _userOwnReviews.value = reviewRepository.userOwnReviews.value
+                        
+                        // Обновить hasUserReviewed флаг
+                        _hasUserReviewed.value = true
+                        
+                        // Обновить публичные отзывы (может понадобиться для рейтинга)
+                        val currentUserId = reviewRepository.getCurrentUserId()
+                        reviewRepository.refreshApprovedReviews(attractionId, excludeUserId = currentUserId)
+                        
                         _submitSuccess.value = true
-                        // Refresh reviews list
-                        loadReviews(attractionId, forceRefresh = true)
+                        
+                        Timber.d("User own reviews count after submit: ${_userOwnReviews.value.size}")
                     }
                     .onFailure { e ->
                         Timber.e(e, "Failed to submit review for attraction $attractionId")

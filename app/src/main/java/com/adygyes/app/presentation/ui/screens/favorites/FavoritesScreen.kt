@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun FavoritesScreen(
-    onAttractionClick: (String) -> Unit,
+    mapViewModel: com.adygyes.app.presentation.viewmodel.MapViewModel,
     onExploreClick: () -> Unit,
     onNavigateBack: (() -> Unit)? = null,
     viewModel: FavoritesViewModel = hiltViewModel()
@@ -166,7 +166,10 @@ fun FavoritesScreen(
                             FavoritesViewModel.ViewMode.LIST -> {
                                 FavoritesListView(
                                     favorites = state.favorites,
-                                    onAttractionClick = onAttractionClick,
+                                    onAttractionClick = { attractionId ->
+                                        mapViewModel.selectAttractionById(attractionId, switchToMap = true)
+                                        onNavigateBack?.invoke()
+                                    },
                                     onRemoveFavorite = { attractionId ->
                                         viewModel.removeFavorite(attractionId)
                                     },
@@ -177,7 +180,10 @@ fun FavoritesScreen(
                             FavoritesViewModel.ViewMode.GRID -> {
                                 FavoritesGridView(
                                     favorites = state.favorites,
-                                    onAttractionClick = onAttractionClick,
+                                    onAttractionClick = { attractionId ->
+                                        mapViewModel.selectAttractionById(attractionId, switchToMap = true)
+                                        onNavigateBack?.invoke()
+                                    },
                                     onRemoveFavorite = { attractionId ->
                                         viewModel.removeFavorite(attractionId)
                                     },

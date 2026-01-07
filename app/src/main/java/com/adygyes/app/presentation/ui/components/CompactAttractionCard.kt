@@ -138,7 +138,7 @@ fun CompactAttractionCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Rating
-                    attraction.rating?.let { rating ->
+                    attraction.averageRating?.let { rating ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp)

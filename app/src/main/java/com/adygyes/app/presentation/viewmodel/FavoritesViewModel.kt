@@ -102,7 +102,7 @@ class FavoritesViewModel @Inject constructor(
         return when (sortBy) {
             SortBy.NAME -> attractions.sortedBy { it.name }
             SortBy.CATEGORY -> attractions.sortedBy { it.category.displayName }
-            SortBy.RATING -> attractions.sortedByDescending { it.rating ?: 0f }
+            SortBy.RATING -> attractions.sortedByDescending { it.averageRating ?: 0f }
             SortBy.DATE_ADDED -> attractions // Already sorted by date added from repository
         }
     }

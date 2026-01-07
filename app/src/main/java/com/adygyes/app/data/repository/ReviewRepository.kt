@@ -107,12 +107,16 @@ class ReviewRepository @Inject constructor(
     /**
      * Refresh approved reviews from Supabase into local in-memory cache.
      * Keeps UI reactive via the Flow from getReviewsForAttraction().
+     * @param excludeUserId - ID пользователя, чьи отзывы нужно исключить из списка (чтобы избежать дублирования)
      */
-    suspend fun refreshApprovedReviews(attractionId: String) {
+    suspend fun refreshApprovedReviews(attractionId: String, excludeUserId: String? = null) {
         when (val result = reviewsRemoteDataSource.getApprovedReviews(attractionId)) {
             is NetworkResult.Success -> {
                 val currentUserId = getCurrentUserId()
-                val base = result.data.map { dto ->
+                val base = result.data
+                    // КРИТИЧНО: исключаем отзывы текущего пользователя из публичного списка
+                    .filter { dto -> excludeUserId == null || dto.userId != excludeUserId }
+                    .map { dto ->
                     Review(
                         id = dto.id,
                         attractionId = dto.attractionId,
@@ -275,15 +279,20 @@ class ReviewRepository @Inject constructor(
         val authState = authRepository.authState.value
         
         if (authState !is AuthState.Authenticated) {
+            Timber.w("loadUserOwnReviews: User not authenticated")
             _userOwnReviews.value = emptyList()
             return Result.success(emptyList())
         }
+        
+        Timber.d("loadUserOwnReviews: userId=${authState.user.id}")
         
         return try {
             val response = supabaseApi.getUserOwnReviews(
                 authorization = "Bearer ${authState.accessToken}",
                 userId = "eq.${authState.user.id}"
             )
+            
+            Timber.d("loadUserOwnReviews: response code=${response.code()}, isSuccessful=${response.isSuccessful}")
             
             if (response.isSuccessful) {
                 val reviews = response.body()?.map { dto ->
@@ -308,9 +317,12 @@ class ReviewRepository @Inject constructor(
                     )
                 } ?: emptyList()
                 
+                Timber.d("loadUserOwnReviews: loaded ${reviews.size} reviews")
                 _userOwnReviews.value = reviews
                 Result.success(reviews)
             } else {
+                val errorBody = response.errorBody()?.string()
+                Timber.e("loadUserOwnReviews: API error ${response.code()}: $errorBody")
                 Result.failure(ReviewException("Не удалось загрузить ваши отзывы"))
             }
         } catch (e: Exception) {
@@ -415,8 +427,12 @@ class ReviewRepository @Inject constructor(
         val authState = authRepository.authState.value
         
         if (authState !is AuthState.Authenticated) {
+            Timber.w("refreshUserOwnReviews: User not authenticated")
+            _userOwnReviews.value = emptyList()
             return
         }
+        
+        Timber.d("refreshUserOwnReviews: attractionId=$attractionId, userId=${authState.user.id}")
         
         try {
             val response = supabaseApi.getUserOwnReviews(
@@ -424,6 +440,8 @@ class ReviewRepository @Inject constructor(
                 userId = "eq.${authState.user.id}",
                 attractionId = "eq.$attractionId"
             )
+            
+            Timber.d("refreshUserOwnReviews: response code=${response.code()}, isSuccessful=${response.isSuccessful}")
             
             if (response.isSuccessful) {
                 val reviews = response.body()?.map { dto ->
@@ -448,10 +466,16 @@ class ReviewRepository @Inject constructor(
                     )
                 } ?: emptyList()
                 
+                Timber.d("refreshUserOwnReviews: loaded ${reviews.size} reviews, statuses=${reviews.map { it.status }}")
                 _userOwnReviews.value = reviews
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Timber.e("refreshUserOwnReviews: API error ${response.code()}: $errorBody")
+                // НЕ очищаем _userOwnReviews, сохраняем предыдущее состояние
             }
         } catch (e: Exception) {
             Timber.e(e, "Failed to refresh user's own reviews for attraction $attractionId")
+            // НЕ очищаем _userOwnReviews при ошибке сети
         }
     }
 
@@ -492,7 +516,7 @@ class ReviewRepository @Inject constructor(
         }
     }
     
-    private fun getCurrentUserId(): String? {
+    fun getCurrentUserId(): String? {
         val authState = authRepository.authState.value
         return (authState as? AuthState.Authenticated)?.user?.id
     }

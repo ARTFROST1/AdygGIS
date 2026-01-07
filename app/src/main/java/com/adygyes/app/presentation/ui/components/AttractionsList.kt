@@ -392,7 +392,7 @@ fun AttractionListItem(
                     )
                     
                     // Rating section - moved to the same level as category
-                    attraction.rating?.let { rating ->
+                    attraction.averageRating?.let { rating ->
                         if (rating > 0) {
                             RatingBar(
                                 rating = rating,

@@ -211,7 +211,7 @@ fun AttractionCard(
                     }
                     
                     // Rating (like RN RatingBar)
-                    attraction.rating?.let { rating ->
+                    attraction.averageRating?.let { rating ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)

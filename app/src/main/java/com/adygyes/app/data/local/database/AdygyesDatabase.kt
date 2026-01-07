@@ -14,7 +14,7 @@ import com.adygyes.app.data.local.entities.Converters
  */
 @Database(
     entities = [AttractionEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -127,12 +127,72 @@ abstract class AdygyesDatabase : RoomDatabase() {
         }
         
         /**
+         * Migration from version 3 to 4
+         * Removes deprecated 'rating' column (replaced by averageRating computed from reviews)
+         * Room requires table recreation to drop column on older SQLite versions
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Recreate table without 'rating' column
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS attractions_new (
+                        id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        latitude REAL NOT NULL,
+                        longitude REAL NOT NULL,
+                        address TEXT,
+                        directions TEXT,
+                        images TEXT NOT NULL,
+                        reviewsCount INTEGER,
+                        averageRating REAL,
+                        workingHours TEXT,
+                        phoneNumber TEXT,
+                        email TEXT,
+                        website TEXT,
+                        tags TEXT NOT NULL,
+                        priceInfo TEXT,
+                        amenities TEXT NOT NULL,
+                        operatingSeason TEXT,
+                        duration TEXT,
+                        bestTimeToVisit TEXT,
+                        isPublished INTEGER NOT NULL,
+                        createdAt TEXT,
+                        updatedAt TEXT,
+                        isFavorite INTEGER NOT NULL,
+                        lastSyncedAt INTEGER NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                """.trimIndent())
+                
+                // Copy data from old table (excluding rating column)
+                database.execSQL("""
+                    INSERT INTO attractions_new 
+                    SELECT id, name, description, category, latitude, longitude, 
+                           address, directions, images, reviewsCount, averageRating,
+                           workingHours, phoneNumber, email, website, tags, priceInfo, amenities,
+                           operatingSeason, duration, bestTimeToVisit, isPublished, createdAt, updatedAt,
+                           isFavorite, lastSyncedAt
+                    FROM attractions
+                """.trimIndent())
+                
+                // Drop old table
+                database.execSQL("DROP TABLE attractions")
+                
+                // Rename new table
+                database.execSQL("ALTER TABLE attractions_new RENAME TO attractions")
+            }
+        }
+        
+        /**
          * Get all migrations array
          */
         fun getMigrations(): Array<Migration> {
             return arrayOf(
                 MIGRATION_1_2,
-                MIGRATION_2_3
+                MIGRATION_2_3,
+                MIGRATION_3_4
             )
         }
     }

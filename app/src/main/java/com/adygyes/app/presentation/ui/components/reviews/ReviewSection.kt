@@ -26,7 +26,7 @@ fun ReviewSection(
     userOwnReviews: List<Review>,
     sortBy: ReviewSortOption,
     onSortChange: (ReviewSortOption) -> Unit,
-    onWriteReview: () -> Unit,
+    onWriteReview: (Int) -> Unit,
     onLike: (String) -> Unit,
     onDislike: (String) -> Unit,
     onShare: (String) -> Unit,
@@ -60,7 +60,7 @@ fun ReviewSection(
         // User's Own Reviews Section
         if (userOwnReviews.isNotEmpty()) {
             Text(
-                text = "Ваш отзыв",
+                text = if (userOwnReviews.size == 1) "Ваш отзыв" else "Ваши отзывы",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -75,7 +75,10 @@ fun ReviewSection(
                     Column(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        StatusBadge(status = review.status ?: "pending")
+                        // Показываем статус только если он не "approved" или null
+                        if (review.status != null && review.status != "approved") {
+                            StatusBadge(status = review.status)
+                        }
                         ReviewCard(
                             review = review,
                             onLike = onLike,

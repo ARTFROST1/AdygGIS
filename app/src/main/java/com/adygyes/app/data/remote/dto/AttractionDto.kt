@@ -38,9 +38,6 @@ data class AttractionDto(
     @SerialName("images")
     val images: List<String> = emptyList(),
     
-    @SerialName("rating")
-    val rating: Float? = null,
-    
     // Reviews aggregate fields (computed by Supabase trigger)
     @SerialName("reviews_count")
     val reviewsCount: Int? = null,

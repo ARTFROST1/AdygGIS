@@ -48,6 +48,7 @@ import com.adygyes.app.presentation.viewmodel.AttractionDetailViewModel
 import com.adygyes.app.presentation.viewmodel.AuthEvent
 import com.adygyes.app.presentation.viewmodel.AuthViewModel
 import com.adygyes.app.presentation.viewmodel.ReviewViewModel
+import timber.log.Timber
 
 /**
  * Detailed attraction information screen
@@ -68,6 +69,7 @@ fun AttractionDetailScreen(
     var showPhotoViewer by remember { mutableStateOf(false) }
     var selectedPhotoIndex by remember { mutableIntStateOf(0) }
     var showWriteReviewModal by remember { mutableStateOf(false) }
+    var initialRating by remember { mutableIntStateOf(0) }
     var showAuthModal by remember { mutableStateOf(false) }
     
     // Review states
@@ -123,6 +125,14 @@ fun AttractionDetailScreen(
     LaunchedEffect(attractionId) {
         viewModel.loadAttraction(attractionId)
         reviewViewModel.loadReviews(attractionId)
+    }
+    
+    // Reload user's own reviews when auth state changes to authenticated
+    LaunchedEffect(isAuthenticated) {
+        if (isAuthenticated) {
+            Timber.d("User authenticated in detail screen, reloading reviews for $attractionId")
+            reviewViewModel.loadReviews(attractionId, forceRefresh = true)
+        }
     }
     
     // Close modal on successful submit and show success message
@@ -298,7 +308,7 @@ fun AttractionDetailScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 CategoryChip(category = attraction.category)
-                                attraction.rating?.let { rating ->
+                                attraction.averageRating?.let { rating ->
                                     RatingBar(
                                         rating = rating,
                                         totalReviews = state.reviewCount
@@ -322,120 +332,40 @@ fun AttractionDetailScreen(
                         }
                     }
                     
-                    // Information cards
+                    // Information section - Modern design matching RN and bottom sheet
                     item {
                         Column(
                             modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // Location card
-                            attraction.location.address?.let { address ->
-                                InfoCard(
-                                    icon = Icons.Default.LocationOn,
-                                    title = stringResource(R.string.detail_location),
-                                    content = {
-                                        Text(
-                                            text = address,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        attraction.location.directions?.let { directions ->
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                text = directions,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                        }
-                                    }
-                                )
-                            }
-                            
-                            // Working hours card
-                            attraction.workingHours?.let { hours ->
-                                InfoCard(
-                                    icon = Icons.Default.Schedule,
-                                    title = stringResource(R.string.detail_working_hours),
-                                    content = {
-                                        Text(
-                                            text = hours,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                )
-                            }
-                            
-                            // Price card
-                            attraction.priceInfo?.let { price ->
-                                InfoCard(
-                                    icon = Icons.Default.AttachMoney,
-                                    title = stringResource(R.string.detail_price),
-                                    content = {
-                                        Text(
-                                            text = price,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                )
-                            }
-                            
-                            // Contact info card
-                            attraction.contactInfo?.let { contact ->
-                                if (contact.phone != null || contact.email != null || contact.website != null) {
-                                    InfoCard(
-                                        icon = Icons.Default.ContactPhone,
-                                        title = stringResource(R.string.detail_contact_info),
-                                        content = {
-                                            ClickableContactInfo(
-                                                contactInfo = contact,
-                                                compact = false
-                                            )
-                                        }
-                                    )
-                                }
-                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            ModernAttractionInfo(attraction = attraction)
                         }
                     }
                     
-                    // Amenities
+                    // Amenities - Modern design
                     if (attraction.amenities.isNotEmpty()) {
                         item {
-                            Column(
+                            ModernAmenitiesSection(
+                                amenities = attraction.amenities,
                                 modifier = Modifier.padding(
                                     horizontal = Dimensions.PaddingLarge,
                                     vertical = Dimensions.PaddingMedium
                                 )
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.detail_amenities),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                AmenitiesGrid(amenities = attraction.amenities)
-                            }
+                            )
                         }
                     }
                     
-                    // Tags
+                    // Tags - Modern design
                     if (attraction.tags.isNotEmpty()) {
                         item {
-                            Column(
+                            ModernTagsSection(
+                                tags = attraction.tags,
                                 modifier = Modifier.padding(
                                     horizontal = Dimensions.PaddingLarge,
                                     vertical = Dimensions.PaddingMedium
                                 )
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.detail_tags),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                TagsFlow(tags = attraction.tags)
-                            }
+                            )
                         }
                     }
                     
@@ -449,15 +379,16 @@ fun AttractionDetailScreen(
                         ReviewSection(
                             attractionId = attraction.id,
                             attractionName = attraction.name,
-                            averageRating = attraction.rating ?: 0f,
+                            averageRating = attraction.averageRating ?: 0f,
                             totalReviews = state.reviewCount,
                             reviews = reviews,
                             userOwnReviews = userOwnReviews,
                             sortBy = reviewSortBy,
                             onSortChange = { reviewViewModel.setSortBy(it) },
-                            onWriteReview = { 
+                            onWriteReview = { rating ->
                                 // Check if user can write review (auth check)
                                 if (reviewViewModel.canWriteReview()) {
+                                    initialRating = rating
                                     showWriteReviewModal = true
                                 }
                                 // If not authenticated, showAuthRequired will trigger AuthModal
@@ -493,7 +424,8 @@ fun AttractionDetailScreen(
                 },
                 attractionName = attraction.name,
                 submitting = submitting,
-                errorMessage = errorMessage
+                errorMessage = errorMessage,
+                initialRating = initialRating
             )
             
             // Auth Modal for review

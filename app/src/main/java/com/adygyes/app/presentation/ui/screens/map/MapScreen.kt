@@ -93,7 +93,6 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
-    onAttractionClick: (String) -> Unit,
     onNavigateToFavorites: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     viewModel: MapViewModel = hiltViewModel()
@@ -108,9 +107,6 @@ fun MapScreen(
     val filteredAttractions by viewModel.filteredAttractions.collectAsStateWithLifecycle()
     val selectedAttraction by viewModel.selectedAttraction.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-    val returnToDetailAttractionId by viewModel.returnToDetailAttractionId.collectAsStateWithLifecycle()
-    val shouldReturnToDetail by viewModel.shouldReturnToDetail.collectAsStateWithLifecycle()
-    val attractionIdToShowOnMap by viewModel.attractionIdToShowOnMap.collectAsStateWithLifecycle()
     val selectedCategoryFilter by viewModel.selectedCategoryFilter.collectAsStateWithLifecycle()
     val sortBy by viewModel.sortBy.collectAsStateWithLifecycle()
     val listViewMode by viewModel.listViewMode.collectAsStateWithLifecycle()
@@ -119,6 +115,8 @@ fun MapScreen(
     val showSearchPanel by viewModel.showSearchPanel.collectAsStateWithLifecycle()
     val searchPanelHasKeyboard by viewModel.searchPanelHasKeyboard.collectAsStateWithLifecycle()
     val selectedFromPanel by viewModel.selectedFromPanel.collectAsStateWithLifecycle()
+    // Track if attraction was opened from list view
+    val openedFromList by viewModel.openedFromList.collectAsStateWithLifecycle()
     
     // UI State - now from ViewModel to persist across navigation
     // Category carousel visibility - always visible in LIST mode, toggleable in MAP mode
@@ -221,29 +219,6 @@ fun MapScreen(
         }
     }
     
-    // Handle return to DetailScreen when bottom sheet is closed
-    LaunchedEffect(shouldReturnToDetail, returnToDetailAttractionId) {
-        val attractionId = returnToDetailAttractionId // Save to local variable for smart cast
-        if (shouldReturnToDetail && attractionId != null) {
-            Timber.d("📍 Returning to DetailScreen for attraction: $attractionId")
-            onAttractionClick(attractionId)
-            viewModel.clearReturnToDetail()
-        }
-    }
-    
-    // Handle showing attraction when navigated from DetailScreen
-    LaunchedEffect(attractionIdToShowOnMap, mapView, filteredAttractions.isNotEmpty(), viewMode) {
-        if (attractionIdToShowOnMap != null && mapView != null && filteredAttractions.isNotEmpty()) {
-            val attraction = filteredAttractions.find { it.id == attractionIdToShowOnMap }
-            if (attraction != null) {
-                Timber.d("🗺️ Showing attraction from DetailScreen: ${attraction.name}, current viewMode: $viewMode")
-                // selectAttractionFromDetailScreen will handle switching to MAP mode
-                viewModel.selectAttractionFromDetailScreen(attraction, mapView)
-                delay(50) // Small delay to ensure state updates
-                viewModel.clearAttractionToShowOnMap() // Clear after showing
-            }
-        }
-    }
     
     // Check if data is preloaded and skip loading if already done
     val preloadState = preloadManager?.preloadState?.collectAsStateWithLifecycle()
@@ -419,7 +394,9 @@ fun MapScreen(
                         // Attractions list/grid (unified carousel is displayed above as part of search area)
                         AttractionsList(
                             attractions = filteredAttractions,
-                            onAttractionClick = onAttractionClick,
+                            onAttractionClick = { attractionId ->
+                                viewModel.selectAttractionById(attractionId)
+                            },
                             onFavoriteClick = { viewModel.toggleFavorite(it) },
                             modifier = Modifier.fillMaxSize(),
                             isLoading = uiState.isLoading,
@@ -886,8 +863,9 @@ fun MapScreen(
                     onToggleFavorite = { 
                         viewModel.toggleFavorite(attraction.id) 
                     },
-                    onNavigateToDetail = { 
-                        onAttractionClick(attraction.id) 
+                    openedFromList = openedFromList,
+                    onShowOnMap = {
+                        viewModel.showAttractionOnMap(attraction, mapView)
                     }
                 )
             }

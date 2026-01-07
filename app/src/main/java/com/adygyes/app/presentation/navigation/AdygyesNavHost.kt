@@ -19,7 +19,6 @@ import com.adygyes.app.presentation.ui.screens.splash.SplashScreen
 import com.adygyes.app.presentation.ui.screens.map.MapScreenContainer
 import com.adygyes.app.presentation.ui.screens.search.SearchScreen
 import com.adygyes.app.presentation.ui.screens.favorites.FavoritesScreen
-import com.adygyes.app.presentation.ui.screens.detail.AttractionDetailScreen
 import com.adygyes.app.presentation.viewmodel.MapViewModel
 
 /**
@@ -79,9 +78,6 @@ fun AdygyesNavHost(
             // MapScreenContainer handles Map ↔ Settings animation internally
             // (exactly like Map ↔ List toggle)
             MapScreenContainer(
-                onAttractionClick = { attractionId ->
-                    navController.navigate(NavDestination.AttractionDetail.createRoute(attractionId))
-                },
                 onNavigateToFavorites = {
                     navController.navigate(NavDestination.Favorites.route)
                 }
@@ -90,20 +86,26 @@ fun AdygyesNavHost(
         
         // Search Screen
         composable(NavDestination.Search.route) {
+            val mapBackStackEntry = remember(navController) {
+                navController.getBackStackEntry(NavDestination.Map.route)
+            }
+            val mapViewModel: MapViewModel = hiltViewModel(mapBackStackEntry)
+            
             SearchScreen(
                 onBackClick = { navController.popBackStack() },
-                onAttractionClick = { attractionId ->
-                    navController.navigate(NavDestination.AttractionDetail.createRoute(attractionId))
-                }
+                mapViewModel = mapViewModel
             )
         }
         
         // Favorites Screen
         composable(NavDestination.Favorites.route) {
+            val mapBackStackEntry = remember(navController) {
+                navController.getBackStackEntry(NavDestination.Map.route)
+            }
+            val mapViewModel: MapViewModel = hiltViewModel(mapBackStackEntry)
+            
             FavoritesScreen(
-                onAttractionClick = { attractionId ->
-                    navController.navigate(NavDestination.AttractionDetail.createRoute(attractionId))
-                },
+                mapViewModel = mapViewModel,
                 onExploreClick = {
                     navController.navigate(NavDestination.Map.route)
                 },
@@ -113,48 +115,7 @@ fun AdygyesNavHost(
         
         // Note: Settings, About, Privacy, Terms are now handled inside MapScreenContainer
         // They animate as overlays like List mode, not as navigation routes
-        
-        // Attraction Detail Screen
-        composable(
-            route = NavDestination.AttractionDetail.route,
-            arguments = listOf(
-                navArgument("attractionId") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val attractionId = backStackEntry.arguments?.getString("attractionId") ?: ""
-            
-            // Get MapViewModel from MapScreen's navigation entry
-            val mapBackStackEntry = remember(navController) {
-                navController.getBackStackEntry(NavDestination.Map.route)
-            }
-            val mapViewModel: MapViewModel = hiltViewModel(mapBackStackEntry)
-            
-            AttractionDetailScreen(
-                attractionId = attractionId,
-                onBackClick = { navController.popBackStack() },
-                onBuildRoute = {
-                    // Will be implemented when Yandex Maps is integrated
-                },
-                onShareClick = {
-                    // Will be implemented with share functionality
-                },
-                // Always show "Show on Map" button
-                onShowOnMap = {
-                    // Set attraction ID in MapViewModel
-                    mapViewModel.setAttractionToShowOnMap(attractionId)
-                    
-                    // Navigate to map and show this attraction
-                    navController.navigate(NavDestination.Map.route) {
-                        // Pop back to map (remove DetailScreen from backstack)
-                        popUpTo(NavDestination.Map.route) {
-                            inclusive = false
-                        }
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
-        
+
         // Photo Gallery Screen
         composable(
             route = NavDestination.PhotoGallery.route,

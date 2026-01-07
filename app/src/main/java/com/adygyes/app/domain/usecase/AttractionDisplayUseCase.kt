@@ -35,7 +35,7 @@ class AttractionDisplayUseCase @Inject constructor() {
             
             // Rating filter
             val meetsRatingRequirement = if (minRating != null) {
-                (attraction.rating ?: 0f) >= minRating
+                (attraction.averageRating ?: 0f) >= minRating
             } else {
                 true
             }
@@ -72,7 +72,7 @@ class AttractionDisplayUseCase @Inject constructor() {
                 }
             }
             SortCriteria.RATING -> {
-                attractions.sortedByDescending { it.rating ?: 0f }
+                attractions.sortedByDescending { it.averageRating ?: 0f }
             }
             SortCriteria.NAME -> {
                 attractions.sortedBy { it.name }
@@ -101,7 +101,7 @@ class AttractionDisplayUseCase @Inject constructor() {
             var score = 0f
             
             // Base score from rating
-            score += (attraction.rating ?: 3f) * 20f
+            score += (attraction.averageRating ?: 3f) * 20f
             
             // Bonus for user preferred categories
             if (userPreferences.contains(attraction.category)) {
@@ -127,7 +127,7 @@ class AttractionDisplayUseCase @Inject constructor() {
             if (attraction.tags.isNotEmpty()) score += 2f
             
             // Bonus for popular attractions (high rating + many tags suggests popularity)
-            if ((attraction.rating ?: 0f) >= 4.5f && attraction.tags.size >= 3) {
+            if ((attraction.averageRating ?: 0f) >= 4.5f && attraction.tags.size >= 3) {
                 score += 10f
             }
             
@@ -176,7 +176,7 @@ class AttractionDisplayUseCase @Inject constructor() {
     fun shouldHighlightAttraction(attraction: Attraction): Boolean {
         return when {
             // High-rated attractions
-            (attraction.rating ?: 0f) >= 4.7f -> true
+            (attraction.averageRating ?: 0f) >= 4.7f -> true
             
             // Popular nature attractions
             attraction.category == AttractionCategory.NATURE && 
@@ -204,7 +204,7 @@ class AttractionDisplayUseCase @Inject constructor() {
     fun getDisplayPriority(attraction: Attraction): DisplayPriority {
         return when {
             shouldHighlightAttraction(attraction) -> DisplayPriority.HIGH
-            (attraction.rating ?: 0f) >= 4.0f -> DisplayPriority.MEDIUM
+            (attraction.averageRating ?: 0f) >= 4.0f -> DisplayPriority.MEDIUM
             attraction.isFavorite -> DisplayPriority.MEDIUM
             else -> DisplayPriority.LOW
         }
@@ -232,7 +232,7 @@ class AttractionDisplayUseCase @Inject constructor() {
             issues.add("Отсутствует адрес")
         }
         
-        if (attraction.rating == null) {
+        if (attraction.averageRating == null) {
             issues.add("Отсутствует рейтинг")
         }
         

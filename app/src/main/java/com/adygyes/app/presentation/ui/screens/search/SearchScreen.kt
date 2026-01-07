@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SearchScreen(
     onBackClick: () -> Unit,
-    onAttractionClick: (String) -> Unit,
+    mapViewModel: com.adygyes.app.presentation.viewmodel.MapViewModel,
     viewModel: SearchViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -228,7 +228,10 @@ fun SearchScreen(
                         SearchResultsList(
                             attractions = state.attractions,
                             favoriteStates = localFavoriteStates,
-                            onAttractionClick = onAttractionClick,
+                            onAttractionClick = { attractionId ->
+                                mapViewModel.selectAttractionById(attractionId, switchToMap = true)
+                                onBackClick()
+                            },
                             onFavoriteClick = { attractionId ->
                                 // Мгновенно обновляем локальное состояние
                                 val currentStatus = localFavoriteStates[attractionId] ?: false
@@ -269,7 +272,10 @@ fun SearchScreen(
                             viewModel.updateSearchQuery(query)
                             viewModel.search()
                         },
-                        onAttractionClick = onAttractionClick,
+                        onAttractionClick = { attractionId ->
+                            mapViewModel.selectAttractionById(attractionId, switchToMap = true)
+                            onBackClick()
+                        },
                         onFavoriteClick = { attractionId ->
                             // Мгновенно обновляем локальное состояние
                             val currentStatus = localFavoriteStates[attractionId] ?: false

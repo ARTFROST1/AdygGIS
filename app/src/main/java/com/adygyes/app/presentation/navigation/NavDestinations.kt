@@ -14,11 +14,6 @@ sealed class NavDestination(val route: String) {
     data object Favorites : NavDestination("favorites")
     data object Settings : NavDestination("settings")
     
-    // Detail screens
-    data object AttractionDetail : NavDestination("attraction/{attractionId}") {
-        fun createRoute(attractionId: String) = "attraction/$attractionId"
-    }
-    
     // Category filter
     data object CategoryFilter : NavDestination("category_filter")
     

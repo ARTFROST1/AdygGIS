@@ -22,7 +22,7 @@ import com.adygyes.app.presentation.theme.Dimensions
 fun RatingSummaryBlock(
     averageRating: Float,
     totalReviews: Int,
-    onRatePress: () -> Unit,
+    onRatePress: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -114,7 +114,7 @@ fun RatingSummaryBlock(
                 // Interactive Rating Stars
                 InteractiveRating(
                     value = 0,
-                    onRatingChange = { onRatePress() },
+                    onRatingChange = { rating -> onRatePress(rating) },
                     size = 32.dp,
                     spacing = 4.dp
                 )

@@ -26,7 +26,6 @@ enum class ScreenMode {
 
 @Composable
 fun MapScreenContainer(
-    onAttractionClick: (String) -> Unit,
     onNavigateToFavorites: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -69,7 +68,6 @@ fun MapScreenContainer(
             when (mode) {
                 ScreenMode.MAP -> {
                     MapScreen(
-                        onAttractionClick = onAttractionClick,
                         onNavigateToFavorites = onNavigateToFavorites,
                         onNavigateToSettings = {
                             screenMode = ScreenMode.SETTINGS // Switch to Settings overlay

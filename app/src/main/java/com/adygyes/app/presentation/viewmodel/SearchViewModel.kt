@@ -48,8 +48,8 @@ class SearchViewModel @Inject constructor(
                 repository.getAllAttractions().collect { attractions ->
                     allAttractions = attractions
                     val popular = attractions
-                        .filter { it.rating != null }
-                        .sortedByDescending { it.rating ?: 0f }
+                        .filter { it.averageRating != null }
+                        .sortedByDescending { it.averageRating ?: 0f }
                         .take(5)
                     
                     _uiState.value = UiState.Initial(
@@ -92,8 +92,8 @@ class SearchViewModel @Inject constructor(
             _uiState.value = UiState.Initial(
                 recentSearches = getRecentSearches(),
                 popularAttractions = allAttractions
-                    .filter { it.rating != null }
-                    .sortedByDescending { it.rating }
+                    .filter { it.averageRating != null }
+                    .sortedByDescending { it.averageRating }
                     .take(5)
             )
             return

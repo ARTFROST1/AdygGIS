@@ -246,7 +246,8 @@ class AttractionRepositoryImpl @Inject constructor(
                     address = "пос. Каменномостский, Республика Адыгея"
                 ),
                 images = listOf("hadzhoh_gorge.jpg"),
-                rating = 4.8f,
+                reviewsCount = 0,
+                averageRating = 4.8f,
                 workingHours = "Ежедневно: 9:00 - 18:00",
                 tags = listOf("природа", "ущелье", "река"),
                 priceInfo = "Взрослый: 500₽, Детский: 250₽"
@@ -262,7 +263,8 @@ class AttractionRepositoryImpl @Inject constructor(
                     address = "пос. Каменномостский, Республика Адыгея"
                 ),
                 images = listOf("rufabgo_waterfalls.jpg"),
-                rating = 4.7f,
+                reviewsCount = 0,
+                averageRating = 4.7f,
                 workingHours = "Ежедневно: 8:00 - 20:00",
                 tags = listOf("водопады", "природа", "треккинг"),
                 priceInfo = "Вход: 400₽"
@@ -278,7 +280,8 @@ class AttractionRepositoryImpl @Inject constructor(
                     address = "Майкопский район, Республика Адыгея"
                 ),
                 images = listOf("lagonaki_plateau.jpg"),
-                rating = 4.9f,
+                reviewsCount = 0,
+                averageRating = 4.9f,
                 tags = listOf("горы", "плато", "треккинг", "панорама"),
                 priceInfo = "Бесплатно"
             ),
@@ -293,7 +296,8 @@ class AttractionRepositoryImpl @Inject constructor(
                     address = "г. Майкоп, ул. Советская, 229"
                 ),
                 images = listOf("national_museum.jpg"),
-                rating = 4.5f,
+                reviewsCount = 0,
+                averageRating = 4.5f,
                 workingHours = "Вт-Вс: 10:00 - 18:00",
                 tags = listOf("музей", "культура", "история"),
                 priceInfo = "Взрослый: 150₽, Студенты: 75₽"
@@ -309,7 +313,8 @@ class AttractionRepositoryImpl @Inject constructor(
                     address = "Майкопский район, Республика Адыгея"
                 ),
                 images = listOf("biosphere_reserve.jpg"),
-                rating = 4.8f,
+                reviewsCount = 0,
+                averageRating = 4.8f,
                 tags = listOf("заповедник", "природа", "экотуризм"),
                 priceInfo = "Экскурсии от 800₽"
             )
@@ -395,7 +400,6 @@ class AttractionRepositoryImpl @Inject constructor(
             address = location.address,
             directions = location.directions,
             images = images,
-            rating = rating,
             reviewsCount = reviewsCount,
             averageRating = averageRating,
             workingHours = workingHours,

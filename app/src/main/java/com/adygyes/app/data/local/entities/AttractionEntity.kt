@@ -26,7 +26,6 @@ data class AttractionEntity(
     val address: String?,
     val directions: String?,
     val images: List<String>,
-    val rating: Float?,
     
     // Reviews aggregate fields (from Supabase trigger)
     val reviewsCount: Int? = null,

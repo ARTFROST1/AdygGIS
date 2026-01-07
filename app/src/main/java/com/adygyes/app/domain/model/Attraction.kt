@@ -16,7 +16,6 @@ data class Attraction(
     val category: AttractionCategory,
     val location: Location,
     val images: List<String>,
-    val rating: Float? = null,
     val workingHours: String? = null,
     val contactInfo: ContactInfo? = null,
     val isFavorite: Boolean = false,

@@ -37,7 +37,6 @@ object AttractionMapper {
                 directions = directions
             ),
             images = images,
-            rating = rating,
             workingHours = workingHours,
             contactInfo = if (phoneNumber != null || email != null || website != null) {
                 ContactInfo(
@@ -73,7 +72,6 @@ object AttractionMapper {
             address = location.address,
             directions = location.directions,
             images = images,
-            rating = rating,
             workingHours = workingHours,
             phoneNumber = contactInfo?.phone,
             email = contactInfo?.email,
@@ -125,7 +123,6 @@ object AttractionMapper {
                 directions = directions
             ),
             images = images,
-            rating = rating,
             workingHours = workingHours,
             contactInfo = if (phoneNumber != null || email != null || website != null) {
                 ContactInfo(
@@ -164,7 +161,6 @@ object AttractionMapper {
             address = address,
             directions = directions,
             images = images,
-            rating = rating,
             workingHours = workingHours,
             phoneNumber = phoneNumber,
             email = email,
