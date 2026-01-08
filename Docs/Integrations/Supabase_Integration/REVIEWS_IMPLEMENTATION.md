@@ -1,12 +1,20 @@
-# Review System Implementation
+# Review System Implementation (Kotlin ↔ Supabase)
 
 ## Обзор
 
-Система отзывов унифицирована с React Native версией, обеспечивая одинаковый UX на обеих платформах.
+Система отзывов в Kotlin реализована как **offline-first**:
+
+- UI показывает отзывы **мгновенно из Room** (если кэш есть)
+- Основная синхронизация подтягивает **все approved отзывы bulk-ом** (чтобы карточки открывались без ожидания сети)
+- При переоткрытии карточки запускается **delta-sync только изменений** (если кэш устарел)
+- Реакции (лайк/дизлайк) работают через **optimistic update**: UI обновляется сразу, потом данные уходят на сервер
 
 Фактический статус Kotlin (по коду):
-- ✅ Чтение `approved` отзывов из Supabase реализовано (с fallback на mock при ошибках/пустом кеше)
-- ✅ Отправка отзывов в Supabase реализована через Supabase Auth (GoTrue) + RLS (статус по умолчанию `pending`)
+- ✅ Bulk sync всех approved отзывов во время `SyncService.performSync()`
+- ✅ Delta sync отзывов на карточке по порогу устаревания кэша
+- ✅ Мгновенная отрисовка из Room (cache-only методы, см. ниже)
+- ✅ Реакции: моментальный отклик + запись в Room + фоновой запрос на Supabase
+- ✅ Реакции не теряются при синхронизации (локальные поля сохраняются при upsert)
 
 > Основная документация по всей связке Auth + Reviews: см. [AUTH_AND_REVIEWS_IMPLEMENTATION.md](./AUTH_AND_REVIEWS_IMPLEMENTATION.md).
 
@@ -24,8 +32,14 @@ ViewModel Layer
 └── ReviewViewModel.kt         - Управление состоянием отзывов
 
 Data Layer
-├── ReviewRepository.kt        - Supabase read (approved) + mock fallback; write через user JWT (Authorization)
-└── Review.kt                  - Модель данных
+├── ReviewRepository.kt        - offline-first для отзывов + реакций
+├── ReviewSyncService.kt       - bulk/delta синхронизация отзывов
+├── ReviewDao.kt               - Room DAO (кэш + локальные поля)
+└── Review.kt                  - доменная модель (унифицирована с RN)
+
+Remote Layer
+├── SupabaseApiService.kt      - REST endpoints для reviews + review_reactions
+└── ReviewsRemoteDataSource.kt - retry + удобные методы для bulk/delta
 ```
 
 ## Компоненты
@@ -127,16 +141,37 @@ data class Review(
     val authorId: String,
     val authorName: String,
     val authorAvatar: String? = null,
-    val authorBadge: String? = null, // "Знаток города 5 уровня"
-    val rating: Int, // 1-5
+    val authorBadge: String? = null,
+    val rating: Int,
     val text: String? = null,
     val createdAt: Instant,
     val updatedAt: Instant? = null,
-    val likes: Int = 0,
-    val dislikes: Int = 0,
-    val isOwn: Boolean = false
+    val likesCount: Int = 0,
+    val dislikesCount: Int = 0,
+    val userReaction: ReviewReaction = ReviewReaction.NONE,
+    val isOwn: Boolean = false,
+    val status: String? = null,
+    val rejectionReason: String? = null
 )
 ```
+
+### ReviewReaction
+
+```kotlin
+enum class ReviewReaction {
+    LIKE,
+    DISLIKE,
+    NONE
+}
+```
+
+### ReviewEntity (Room)
+
+Room хранит не только серверные поля, но и локальные:
+
+- `userReaction` — реакция текущего пользователя (кэш, чтобы UI не делал лишних запросов)
+- `isOwnReview` — флаг «это мой отзыв» (важно не потерять при bulk/delta sync)
+- `lastSyncedAt` — время последней синхронизации для логики staleness
 
 ### ReviewSortOption
 
@@ -160,29 +195,24 @@ enum class ReviewSortOption {
 - `error: StateFlow<String?>` - Ошибка
 - `sortBy: StateFlow<ReviewSortOption>` - Текущая сортировка
 
-**Методы:**
-- `loadReviews(attractionId)` - Загрузить отзывы для места
-- `setSortBy(sortBy)` - Изменить сортировку
-- `likeReview(reviewId)` - Лайкнуть отзыв
-- `dislikeReview(reviewId)` - Дизлайкнуть отзыв
-- `clearReviews()` - Очистить кэш
+**Ключевые методы:**
+- `loadReviews(attractionId)` — сначала грузит Room кэш мгновенно, затем запускает background sync
+- `reactToReview(reviewId, isLike)` — **optimistic update**: UI обновляется мгновенно, сервер подтверждает в фоне
 
 ## ReviewRepository
 
 **Расположение:** `data/repository/ReviewRepository.kt`
 
-**Методы:**
-- `getReviewsForAttraction(attractionId, sortBy): Flow<List<Review>>`
-- `fetchReviews(attractionId): Result<List<Review>>`
-- `submitReview(submission): Result<Review>`
-- `updateReaction(reviewId, isLike): Result<Unit>`
+**Основные методы (актуально):**
+- `getReviewsFromCacheOnly(attractionId)` — мгновенно из Room, без сети
+- `performBackgroundSync(attractionId)` — синхронизация в фоне (delta/bulk по необходимости)
+- `submitReview(submission)` — создание review (server sets status=pending)
+- `reactToReviewOptimistic(...)` — запись в Room + отправка на сервер
 
-**⚠️ Mock Data:**
-Репозиторий сейчас использует mock данные. При интеграции с Supabase необходимо:
-1. Создать таблицу `reviews` в Supabase
-2. Добавить endpoint в `SupabaseApiService`
-3. Реализовать `SupabaseReviewDataSource`
-4. Обновить `ReviewRepository` для работы с Supabase
+> `getReviewsOfflineFirst()` и `backgroundSyncReviews()` остаются для совместимости, но помечены как deprecated.
+
+Важно:
+- Репозиторий НЕ должен делать «полный рефреш всех отзывов» после реакции — реакция фиксируется локально и синхронизируется отдельно.
 
 ## Интеграция в AttractionBottomSheet
 
@@ -229,20 +259,56 @@ ReviewSection(
 - "X мес. назад" - если < 365 дней
 - "DD месяц YYYY" - если > года
 
-## TODO для Production
+## Синхронизация отзывов (bulk/delta)
 
-1. ✅ Создать компоненты UI
-2. ✅ Создать модели данных
-3. ✅ Создать ViewModel
-4. ✅ Создать Repository с mock данными
-5. ✅ Интегрировать в AttractionBottomSheet
-6. ⬜ Создать модалку написания отзыва (WriteReviewModal)
-7. ⬜ Добавить таблицу `reviews` в Supabase
-8. ⬜ Реализовать Supabase integration
-9. ⬜ Добавить функцию Share review
-10. ⬜ Добавить функцию Edit/Delete own review
-11. ⬜ Добавить пагинацию для больших списков
-12. ⬜ Добавить pull-to-refresh
+### Bulk sync (во время общего sync)
+
+Источник: `SyncService.performSync()` вызывает `ReviewSyncService.performBulkSync()`.
+
+Логика:
+- Если кэш пустой → `getAllApprovedReviews()` и `replaceAllApprovedReviews()`
+- Если кэш уже есть → глобальный delta sync по `MAX(updatedAt)`
+
+### Delta sync на карточке
+
+Источник: `ReviewRepository.backgroundSyncReviews()` → `ReviewSyncService.syncReviewsForAttraction()`.
+
+Правила:
+- Если `now - lastSyncedAt < 5 минут` → сеть пропускаем
+- Иначе:
+    - если есть cached `MAX(updatedAt)` → тянем `getUpdatedReviewsForAttraction()`
+    - если кэша нет → `getApprovedReviewsForAttraction()`
+
+### Сохранение локальных полей
+
+При upsert отзывов из Supabase сохраняются локальные поля (`isOwnReview`, `userReaction`, `rejectionReason`) по `id`.
+
+Это важно, чтобы:
+- реакции не сбрасывались после sync
+- “мой отзыв” не превращался в “чужой” при появлении публичной версии
+
+## Реакции (лайк/дизлайк)
+
+### Цель
+
+Сделать реакции мгновенными:
+
+1) UI меняется сразу
+2) Room кэш обновляется сразу
+3) Сервер получает запрос в фоне
+4) Если сервер вернул ошибку — откат
+
+### Хранение в Room
+
+`ReviewEntity.userReaction` хранит `"like" | "dislike" | null`.
+
+### Синхронизация с сервером
+
+Используются endpoints `review_reactions`:
+
+- `POST /rest/v1/review_reactions` (Prefer: resolution=merge-duplicates)
+- `DELETE /rest/v1/review_reactions?review_id=eq...&user_id=eq...`
+- `GET /rest/v1/review_reactions?...` (batch) — используется для сверки, но без N×Room запросов
 
 ## Соответствие RN версии
 
@@ -253,9 +319,17 @@ ReviewSection(
 | RatingSummaryBlock.tsx | RatingSummaryBlock.kt | ✅ |
 | InteractiveRating.tsx | InteractiveRating.kt | ✅ |
 | ReviewSortDropdown.tsx | ReviewSortDropdown.kt | ✅ |
-| WriteReviewModal.tsx | - | ⬜ |
+| WriteReviewModal.tsx | WriteReviewModal.kt | ✅ |
 | useReviewStore.ts | ReviewViewModel.kt | ✅ |
 | Review type | Review.kt | ✅ |
+
+## Где смотреть код
+
+- `data/sync/ReviewSyncService.kt` — bulk/delta логика
+- `data/sync/SyncService.kt` — общий sync + вызов bulk sync отзывов
+- `data/repository/ReviewRepository.kt` — offline-first + реакции
+- `presentation/viewmodel/ReviewViewModel.kt` — моментальный UI + rollback
+- `data/local/dao/ReviewDao.kt` — методы кэша и обновления реакций
 
 ## Примеры использования
 

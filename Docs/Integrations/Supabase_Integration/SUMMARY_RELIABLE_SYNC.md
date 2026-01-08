@@ -27,27 +27,27 @@
 ## ✅ Реализованные решения
 
 ### 1. Network Security Config ✅
-- Создан [network_security_config.xml](c:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/main/res/xml/network_security_config.xml)
+- Создан [network_security_config.xml](../../../app/src/main/res/xml/network_security_config.xml)
 - Строгое HTTPS для Supabase
 - Защита от MITM атак
 - Обновлён AndroidManifest.xml
 
 ### 2. RetryInterceptor с Exponential Backoff ✅
-- Создан [RetryInterceptor.kt](c:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/data/remote/RetryInterceptor.kt)
+- Создан [RetryInterceptor.kt](../../../app/src/main/java/com/adygyes/app/data/remote/RetryInterceptor.kt)
 - Автоматический retry (до 3 попыток)
 - Exponential backoff: 1s → 2s → 4s
 - Обработка: timeout, DNS, SSL, IO errors
 
-### 3. Увеличены таймауты ✅
-- **Connect:** 15s → **30s** (+100%)
-- **Read:** 10s → **45s** (+350%) ⭐
-- **Write:** 15s → **30s** (+100%)
-- **Call (новый):** **90s** (total)
+### 3. Оптимизированы таймауты ✅
+- **Connect:** 15s (без изменений)
+- **Read:** 10s → **25s**
+- **Write:** 15s (без изменений)
+- **Call (новый):** **120s** (общий бюджет для request+retry)
 
-### 4. DNS Fallback ✅
-- Повторная попытка DNS lookup при ошибке
-- Задержка 500ms между попытками
-- Решает проблемы медленного DNS на сотовых операторах
+### 4. DNS (DoH + fallback) ✅
+- DoH (Cloudflare) для Supabase-хостов
+- Fallback на системный DNS
+- Решает проблемы медленного/ошибочного DNS на сотовых операторах
 
 ### 5. Connection Pooling ✅
 - Переиспользование TCP соединений
@@ -55,7 +55,7 @@
 - Keep-alive: 30 секунд
 
 ### 6. Проверка сети перед синхронизацией ✅
-- Обновлён [SyncService.kt](c:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/data/sync/SyncService.kt)
+- Обновлён [SyncService.kt](../../../app/src/main/java/com/adygyes/app/data/sync/SyncService.kt)
 - Определение типа сети (WiFi/Cellular/None)
 - Понятные ошибки на русском языке
 - Graceful degradation для tombstones
@@ -67,7 +67,7 @@
 - Экономия: **до 80% трафика**
 
 ### 8. Обновлены зависимости Dagger ✅
-- Обновлён [SyncModule.kt](c:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/di/module/SyncModule.kt)
+- Обновлён [SyncModule.kt](../../../app/src/main/java/com/adygyes/app/di/module/SyncModule.kt)
 - Добавлен NetworkUseCase в зависимости SyncService
 
 ---
@@ -134,8 +134,8 @@ adb logcat -s SyncService:D RetryInterceptor:D NetworkModule:D
 
 ## 📚 Документация
 
-1. [RELIABLE_SYNC_IMPLEMENTATION.md](c:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/Docs/Integrations/Supabase_Integration/RELIABLE_SYNC_IMPLEMENTATION.md) - полное описание решения
-2. [SYNC_TESTING_CHECKLIST.md](c:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/Docs/Integrations/Supabase_Integration/SYNC_TESTING_CHECKLIST.md) - чек-лист тестирования
+1. [RELIABLE_SYNC_IMPLEMENTATION.md](./RELIABLE_SYNC_IMPLEMENTATION.md) - полное описание решения
+2. [SYNC_TESTING_CHECKLIST.md](./SYNC_TESTING_CHECKLIST.md) - чек-лист тестирования
 
 ---
 

@@ -1,5 +1,8 @@
 package com.adygyes.app.presentation.ui.components.reviews
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,6 +18,11 @@ import com.adygyes.app.presentation.theme.Dimensions
  * Review Section Component
  * Полная секция отзывов с рейтингом и списком
  * Unified with RN ReviewSection component
+ * 
+ * OFFLINE-FIRST ARCHITECTURE:
+ * - Shows cached reviews instantly (loading=false when cache exists)
+ * - isSyncing=true shows subtle indicator that background sync is happening
+ * - No blocking spinners when data is already available
  */
 @Composable
 fun ReviewSection(
@@ -31,21 +39,46 @@ fun ReviewSection(
     onDislike: (String) -> Unit,
     onShare: (String) -> Unit,
     modifier: Modifier = Modifier,
-    loading: Boolean = false
+    loading: Boolean = false,
+    isSyncing: Boolean = false // Background sync indicator (non-blocking)
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = Dimensions.PaddingExtraLarge)
     ) {
-        // Section Title
-        Text(
-            text = "Отзывы",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge, vertical = Dimensions.PaddingMedium)
-        )
+        // Section Title with optional sync indicator
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimensions.PaddingLarge, vertical = Dimensions.PaddingMedium),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Отзывы",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            // Subtle sync indicator (doesn't block content)
+            AnimatedVisibility(
+                visible = isSyncing && !loading,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
         
         // Rating Summary
         RatingSummaryBlock(
@@ -81,8 +114,14 @@ fun ReviewSection(
                         }
                         ReviewCard(
                             review = review,
-                            onLike = onLike,
-                            onDislike = onDislike,
+                            onLike = { reviewId ->
+                                android.util.Log.d("ReviewSection", "🔗 onLike (own review) called: $reviewId")
+                                onLike(reviewId)
+                            },
+                            onDislike = { reviewId ->
+                                android.util.Log.d("ReviewSection", "🔗 onDislike (own review) called: $reviewId")
+                                onDislike(reviewId)
+                            },
                             onShare = onShare
                         )
                     }
@@ -172,8 +211,14 @@ fun ReviewSection(
                 reviews.forEach { review ->
                     ReviewCard(
                         review = review,
-                        onLike = onLike,
-                        onDislike = onDislike,
+                        onLike = { reviewId ->
+                            android.util.Log.d("ReviewSection", "🔗 onLike (public review) called: $reviewId")
+                            onLike(reviewId)
+                        },
+                        onDislike = { reviewId ->
+                            android.util.Log.d("ReviewSection", "🔗 onDislike (public review) called: $reviewId")
+                            onDislike(reviewId)
+                        },
                         onShare = onShare
                     )
                 }

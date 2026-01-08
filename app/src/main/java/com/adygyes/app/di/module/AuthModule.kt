@@ -1,5 +1,8 @@
 package com.adygyes.app.di.module
 
+import com.adygyes.app.data.local.preferences.SecureAuthPreferencesManager
+import com.adygyes.app.data.remote.ProactiveTokenRefreshInterceptor
+import com.adygyes.app.data.remote.TokenAuthenticator
 import com.adygyes.app.data.remote.api.SupabaseAuthApi
 import com.adygyes.app.data.remote.config.SupabaseConfig
 import dagger.Module
@@ -7,6 +10,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
+import okhttp3.Authenticator
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -32,7 +36,19 @@ annotation class AuthRetrofit
 annotation class AuthClient
 
 /**
+ * Qualifier for authenticated API client with token refresh
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class AuthenticatedClient
+
+/**
  * Hilt module for authentication-related dependencies
+ * 
+ * Provides:
+ * - Auth API client (for login/register/refresh endpoints)
+ * - Token authenticator (for automatic 401 retry)
+ * - Proactive token refresh interceptor
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -56,7 +72,7 @@ object AuthModule {
     }
     
     /**
-     * OkHttp client for auth requests
+     * OkHttp client for auth requests (login, register, refresh)
      */
     @Provides
     @Singleton
@@ -100,5 +116,29 @@ object AuthModule {
     @Singleton
     fun provideSupabaseAuthApi(@AuthRetrofit retrofit: Retrofit): SupabaseAuthApi {
         return retrofit.create(SupabaseAuthApi::class.java)
+    }
+    
+    /**
+     * Token authenticator for automatic 401 retry with token refresh
+     */
+    @Provides
+    @Singleton
+    fun provideTokenAuthenticator(
+        secureAuthPrefs: SecureAuthPreferencesManager,
+        authApiProvider: dagger.Lazy<SupabaseAuthApi>
+    ): TokenAuthenticator {
+        return TokenAuthenticator(secureAuthPrefs, authApiProvider)
+    }
+    
+    /**
+     * Proactive token refresh interceptor
+     */
+    @Provides
+    @Singleton
+    fun provideProactiveTokenRefreshInterceptor(
+        secureAuthPrefs: SecureAuthPreferencesManager,
+        authApiProvider: dagger.Lazy<SupabaseAuthApi>
+    ): ProactiveTokenRefreshInterceptor {
+        return ProactiveTokenRefreshInterceptor(secureAuthPrefs, authApiProvider)
     }
 }

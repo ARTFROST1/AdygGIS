@@ -1,7 +1,7 @@
 package com.adygyes.app.data.repository
 
 import com.adygyes.app.BuildConfig
-import com.adygyes.app.data.local.preferences.AuthPreferencesManager
+import com.adygyes.app.data.local.preferences.SecureAuthPreferencesManager
 import com.adygyes.app.data.remote.api.SupabaseAuthApi
 import com.adygyes.app.data.remote.dto.AuthErrorResponse
 import com.adygyes.app.data.remote.dto.AuthResponse
@@ -19,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import timber.log.Timber
@@ -30,14 +31,19 @@ import javax.inject.Singleton
  * 
  * Features:
  * - Email/password sign in and sign up
- * - Session persistence via DataStore
- * - Automatic token refresh
+ * - Secure session persistence via EncryptedSharedPreferences
+ * - Automatic token refresh with expiration tracking
  * - Password reset
+ * 
+ * Security improvements:
+ * - Tokens are encrypted at rest using AndroidKeyStore
+ * - Token expiration time is tracked for proactive refresh
+ * - Automatic token refresh on 401 via TokenAuthenticator
  */
 @Singleton
 class AuthRepository @Inject constructor(
     private val authApi: SupabaseAuthApi,
-    private val authPrefs: AuthPreferencesManager,
+    private val secureAuthPrefs: SecureAuthPreferencesManager,
     private val json: Json
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -52,6 +58,30 @@ class AuthRepository @Inject constructor(
         // Check for stored session on startup
         scope.launch {
             restoreSession()
+        }
+
+        // Keep repository state in sync with token updates (e.g., OkHttp refresh)
+        scope.launch {
+            secureAuthPrefs.accessTokenFlow.collect { newToken ->
+                if (newToken.isNullOrBlank()) {
+                    currentAccessToken = null
+                    val current = _authState.value
+                    if (current is AuthState.Authenticated) {
+                        _authState.value = AuthState.Unauthenticated
+                    }
+                    return@collect
+                }
+
+                currentAccessToken = newToken
+                val current = _authState.value
+                if (current is AuthState.Authenticated && current.accessToken != newToken) {
+                    val refreshedRefreshToken = secureAuthPrefs.getRefreshToken() ?: current.refreshToken
+                    _authState.value = current.copy(
+                        accessToken = newToken,
+                        refreshToken = refreshedRefreshToken
+                    )
+                }
+            }
         }
     }
     
@@ -77,19 +107,35 @@ class AuthRepository @Inject constructor(
     }
     
     /**
-     * Restore session from stored preferences
+     * Restore session from secure stored preferences
      */
     private suspend fun restoreSession() {
         try {
-            val storedData = authPrefs.getStoredUser()
+            val storedData = secureAuthPrefs.getStoredUser()
             if (storedData != null) {
-                Timber.d("Found stored session, attempting to refresh token")
-                // Try to refresh the token
-                val result = refreshToken(storedData.refreshToken)
-                if (result.isFailure) {
-                    Timber.w("Token refresh failed, clearing session")
-                    authPrefs.clearSession()
-                    _authState.value = AuthState.Unauthenticated
+                Timber.d("Found stored session for user: ${storedData.email}")
+                
+                // Check if token is expired
+                if (secureAuthPrefs.isTokenExpired()) {
+                    Timber.d("Token is expired, attempting to refresh")
+                    val result = refreshToken(storedData.refreshToken)
+                    if (result.isFailure) {
+                        Timber.w("Token refresh failed, clearing session")
+                        secureAuthPrefs.clearSession()
+                        _authState.value = AuthState.Unauthenticated
+                    }
+                } else if (secureAuthPrefs.shouldRefreshToken()) {
+                    // Token will expire soon, refresh proactively
+                    Timber.d("Token expiring soon, refreshing proactively")
+                    val result = refreshToken(storedData.refreshToken)
+                    if (result.isFailure) {
+                        // Still use the old token if refresh fails but token is not yet expired
+                        Timber.w("Proactive refresh failed, using existing token")
+                        restoreFromStoredData(storedData)
+                    }
+                } else {
+                    // Token is still valid
+                    restoreFromStoredData(storedData)
                 }
             } else {
                 Timber.d("No stored session found")
@@ -99,6 +145,22 @@ class AuthRepository @Inject constructor(
             Timber.e(e, "Error restoring session")
             _authState.value = AuthState.Unauthenticated
         }
+    }
+    
+    private fun restoreFromStoredData(storedData: SecureAuthPreferencesManager.StoredUserData) {
+        val user = User(
+            id = storedData.userId,
+            email = storedData.email,
+            displayName = storedData.displayName,
+            avatarUrl = storedData.avatarUrl
+        )
+        currentAccessToken = storedData.accessToken
+        _authState.value = AuthState.Authenticated(
+            user = user,
+            accessToken = storedData.accessToken,
+            refreshToken = storedData.refreshToken
+        )
+        Timber.d("Session restored for user: ${user.email}")
     }
     
     /**
@@ -216,7 +278,7 @@ class AuthRepository @Inject constructor(
             }
             
             // Clear local session
-            authPrefs.clearSession()
+            secureAuthPrefs.clearSession()
             currentAccessToken = null
             _authState.value = AuthState.Unauthenticated
             
@@ -225,7 +287,7 @@ class AuthRepository @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Sign out failed")
             // Still clear local state even if server call failed
-            authPrefs.clearSession()
+            secureAuthPrefs.clearSession()
             currentAccessToken = null
             _authState.value = AuthState.Unauthenticated
             Result.success(Unit)
@@ -237,7 +299,7 @@ class AuthRepository @Inject constructor(
      */
     suspend fun refreshToken(refreshToken: String? = null): Result<Unit> {
         return try {
-            val token = refreshToken ?: authPrefs.getRefreshToken()
+            val token = refreshToken ?: secureAuthPrefs.getRefreshToken()
             if (token == null) {
                 _authState.value = AuthState.Unauthenticated
                 return Result.failure(AuthException("Сессия истекла. Войдите снова."))
@@ -250,14 +312,22 @@ class AuthRepository @Inject constructor(
                 Result.success(Unit)
             } else {
                 // Token invalid, clear session
-                authPrefs.clearSession()
+                secureAuthPrefs.clearSession()
                 currentAccessToken = null
                 _authState.value = AuthState.Unauthenticated
                 Result.failure(AuthException("Сессия истекла. Войдите снова."))
             }
         } catch (e: Exception) {
             Timber.e(e, "Token refresh failed")
-            Result.failure(AuthException("Не удалось обновить сессию"))
+            val isExpired = runCatching { secureAuthPrefs.isTokenExpired() }.getOrDefault(true)
+            if (isExpired) {
+                secureAuthPrefs.clearSession()
+                currentAccessToken = null
+                _authState.value = AuthState.Unauthenticated
+                Result.failure(AuthException("Сессия истекла. Войдите снова."))
+            } else {
+                Result.failure(AuthException("Не удалось обновить сессию. Проверьте интернет."))
+            }
         }
     }
     
@@ -297,10 +367,15 @@ class AuthRepository @Inject constructor(
     private suspend fun handleAuthSuccess(authResponse: AuthResponse) {
         val user = authResponseToUser(authResponse)
         
-        // Save to preferences
-        authPrefs.saveSession(
+        // Calculate expiration time (Supabase returns seconds or timestamp)
+        val expiresAt = authResponse.expiresAt 
+            ?: (System.currentTimeMillis() / 1000 + (authResponse.expiresIn ?: 3600))
+        
+        // Save to secure preferences with expiration time
+        secureAuthPrefs.saveSession(
             accessToken = authResponse.accessToken,
             refreshToken = authResponse.refreshToken,
+            expiresAt = expiresAt,
             userId = user.id,
             email = user.email,
             displayName = user.displayName,
@@ -317,7 +392,7 @@ class AuthRepository @Inject constructor(
             refreshToken = authResponse.refreshToken
         )
         
-        Timber.d("Auth success for user: ${user.email}")
+        Timber.d("Auth success for user: ${user.email}, token expires at: ${java.util.Date(expiresAt * 1000)}")
     }
     
     private fun authResponseToUser(response: AuthResponse): User {

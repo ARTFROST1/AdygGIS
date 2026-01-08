@@ -148,7 +148,10 @@ fun ReviewCard(
                 onLike?.let { onLikeClick ->
                     val isLiked = review.userReaction == ReviewReaction.LIKE
                     IconButton(
-                        onClick = { onLikeClick(review.id) },
+                        onClick = { 
+                            android.util.Log.d("ReviewCard", "👆 LIKE CLICKED! reviewId=${review.id}, isOwn=${review.isOwn}, enabled=${!review.isOwn}")
+                            onLikeClick(review.id) 
+                        },
                         modifier = Modifier.size(32.dp),
                         enabled = !review.isOwn
                     ) {
@@ -185,7 +188,10 @@ fun ReviewCard(
                 onDislike?.let { onDislikeClick ->
                     val isDisliked = review.userReaction == ReviewReaction.DISLIKE
                     IconButton(
-                        onClick = { onDislikeClick(review.id) },
+                        onClick = { 
+                            android.util.Log.d("ReviewCard", "👆 DISLIKE CLICKED! reviewId=${review.id}, isOwn=${review.isOwn}, enabled=${!review.isOwn}")
+                            onDislikeClick(review.id) 
+                        },
                         modifier = Modifier.size(32.dp),
                         enabled = !review.isOwn
                     ) {

@@ -1,6 +1,8 @@
 package com.adygyes.app.presentation.ui.components.auth
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -21,13 +23,13 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.adygyes.app.presentation.theme.Dimensions
+import com.adygyes.app.presentation.viewmodel.PasswordStrength
 
 /**
  * Authentication mode
@@ -52,6 +55,11 @@ enum class AuthMode {
 /**
  * Auth Modal Component for login/register/password reset
  * Unified with RN AuthModal component
+ * 
+ * Improvements:
+ * - Password strength indicator for sign up
+ * - Better error feedback
+ * - Debounce protection via ViewModel
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +72,8 @@ fun AuthModal(
     isLoading: Boolean = false,
     errorMessage: String? = null,
     onClearError: () -> Unit = {},
+    passwordStrength: PasswordStrength = PasswordStrength.NONE,
+    onPasswordChange: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (!visible) return
@@ -103,7 +113,7 @@ fun AuthModal(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f))
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
@@ -235,55 +245,70 @@ fun AuthModal(
                         
                         // Password field (sign in and sign up only)
                         AnimatedVisibility(visible = authMode != AuthMode.FORGOT_PASSWORD) {
-                            OutlinedTextField(
-                                value = password,
-                                onValueChange = { password = it },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 16.dp),
-                                label = { Text("Пароль") },
-                                placeholder = { Text("Минимум 6 символов") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Lock,
-                                        contentDescription = null
-                                    )
-                                },
-                                trailingIcon = {
-                                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Column {
+                                OutlinedTextField(
+                                    value = password,
+                                    onValueChange = { newPassword ->
+                                        password = newPassword
+                                        onPasswordChange?.invoke(newPassword)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp),
+                                    label = { Text("Пароль") },
+                                    placeholder = { Text("Минимум 6 символов") },
+                                    leadingIcon = {
                                         Icon(
-                                            imageVector = if (passwordVisible) 
-                                                Icons.Default.VisibilityOff 
-                                            else 
-                                                Icons.Default.Visibility,
-                                            contentDescription = if (passwordVisible) 
-                                                "Скрыть пароль" 
-                                            else 
-                                                "Показать пароль"
+                                            imageVector = Icons.Default.Lock,
+                                            contentDescription = null
                                         )
-                                    }
-                                },
-                                visualTransformation = if (passwordVisible) 
-                                    VisualTransformation.None 
-                                else 
-                                    PasswordVisualTransformation(),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Password,
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onDone = {
-                                        focusManager.clearFocus()
-                                        when (authMode) {
-                                            AuthMode.SIGN_IN -> onSignIn(email, password)
-                                            AuthMode.SIGN_UP -> onSignUp(email, password, displayName.takeIf { it.isNotBlank() })
-                                            else -> {}
+                                    },
+                                    trailingIcon = {
+                                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                            Icon(
+                                                imageVector = if (passwordVisible) 
+                                                    Icons.Default.VisibilityOff 
+                                                else 
+                                                    Icons.Default.Visibility,
+                                                contentDescription = if (passwordVisible) 
+                                                    "Скрыть пароль" 
+                                                else 
+                                                    "Показать пароль"
+                                            )
                                         }
-                                    }
-                                ),
-                                shape = RoundedCornerShape(12.dp)
-                            )
+                                    },
+                                    visualTransformation = if (passwordVisible) 
+                                        VisualTransformation.None 
+                                    else 
+                                        PasswordVisualTransformation(),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
+                                            focusManager.clearFocus()
+                                            when (authMode) {
+                                                AuthMode.SIGN_IN -> onSignIn(email, password)
+                                                AuthMode.SIGN_UP -> onSignUp(email, password, displayName.takeIf { it.isNotBlank() })
+                                                else -> {}
+                                            }
+                                        }
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                
+                                // Password strength indicator (only for sign up)
+                                AnimatedVisibility(
+                                    visible = authMode == AuthMode.SIGN_UP && password.isNotEmpty()
+                                ) {
+                                    PasswordStrengthIndicator(
+                                        strength = passwordStrength,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                }
+                            }
                         }
                         
                         // Error message
@@ -433,6 +458,93 @@ fun AuthPromptBanner(
             ) {
                 Text("Войти")
             }
+        }
+    }
+}
+
+/**
+ * Password strength indicator component
+ * Shows visual feedback about password strength during registration
+ */
+@Composable
+fun PasswordStrengthIndicator(
+    strength: PasswordStrength,
+    modifier: Modifier = Modifier
+) {
+    val progress by animateFloatAsState(
+        targetValue = when (strength) {
+            PasswordStrength.NONE -> 0f
+            PasswordStrength.WEAK -> 0.33f
+            PasswordStrength.MEDIUM -> 0.66f
+            PasswordStrength.STRONG -> 1f
+        },
+        label = "password_strength_progress"
+    )
+    
+    val color by animateColorAsState(
+        targetValue = when (strength) {
+            PasswordStrength.NONE -> MaterialTheme.colorScheme.outline
+            PasswordStrength.WEAK -> MaterialTheme.colorScheme.error
+            PasswordStrength.MEDIUM -> MaterialTheme.colorScheme.tertiary
+            PasswordStrength.STRONG -> MaterialTheme.colorScheme.primary
+        },
+        label = "password_strength_color"
+    )
+    
+    val label = when (strength) {
+        PasswordStrength.NONE -> ""
+        PasswordStrength.WEAK -> "Слабый пароль"
+        PasswordStrength.MEDIUM -> "Средний пароль"
+        PasswordStrength.STRONG -> "Надёжный пароль"
+    }
+    
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Progress bar
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp)),
+                color = color,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // Label
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = color
+            )
+            
+            // Checkmark for strong password
+            AnimatedVisibility(visible = strength == PasswordStrength.STRONG) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Надёжный пароль",
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .size(16.dp),
+                    tint = color
+                )
+            }
+        }
+        
+        // Password requirements hint
+        if (strength != PasswordStrength.STRONG && strength != PasswordStrength.NONE) {
+            Text(
+                text = "Используйте буквы, цифры и спецсимволы",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }

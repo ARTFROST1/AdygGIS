@@ -1,7 +1,9 @@
 package com.adygyes.app.di.module
 
 import com.adygyes.app.BuildConfig
+import com.adygyes.app.data.remote.ProactiveTokenRefreshInterceptor
 import com.adygyes.app.data.remote.RetryInterceptor
+import com.adygyes.app.data.remote.TokenAuthenticator
 import com.adygyes.app.data.remote.api.SupabaseApiService
 import com.adygyes.app.data.remote.config.SupabaseConfig
 import dagger.Module
@@ -311,6 +313,8 @@ object NetworkModule {
      * - Automatic retry with exponential backoff
      * - DNS fallback for unreliable networks
      * - Connection pooling for performance
+     * - Token authenticator for automatic 401 retry
+     * - Proactive token refresh before expiration
      */
     @Provides
     @Singleton
@@ -321,16 +325,23 @@ object NetworkModule {
         retryInterceptor: RetryInterceptor,
         eventListener: EventListener,
         dns: Dns,
-        connectionPool: ConnectionPool
+        connectionPool: ConnectionPool,
+        tokenAuthenticator: TokenAuthenticator,
+        proactiveRefreshInterceptor: ProactiveTokenRefreshInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             // Interceptors order matters:
             // 1. Retry logic (outermost)
             .addInterceptor(retryInterceptor)
-            // 2. Auth headers
+            // 2. Proactive token refresh (before request)
+            .addInterceptor(proactiveRefreshInterceptor)
+            // 3. Auth headers
             .addInterceptor(supabaseInterceptor)
-            // 3. Logging (innermost, after all modifications)
+            // 4. Logging (innermost, after all modifications)
             .addInterceptor(loggingInterceptor)
+            
+            // Token authenticator for automatic 401 retry
+            .authenticator(tokenAuthenticator)
             
             // Event listener for detailed diagnostics
             .eventListener(eventListener)
@@ -338,12 +349,14 @@ object NetworkModule {
             // Optimized timeouts for cellular networks
             // Connect timeout: Fast failure on dead TCP connections
             .connectTimeout(15, TimeUnit.SECONDS)
-            // Read timeout: INCREASED for slow cellular data transfer (40KB JSON can take time)
-            .readTimeout(60, TimeUnit.SECONDS)      // 60s to handle slow cellular data transfer
+            // Read timeout: keep shorter to avoid "wait 60s then retry" behavior.
+            // If a request is truly slow, RetryInterceptor will still provide one retry.
+            .readTimeout(25, TimeUnit.SECONDS)
             // Write timeout: Requests are small, keep short
             .writeTimeout(15, TimeUnit.SECONDS)
-            // Call timeout: Total time budget for request+response+retry
-            .callTimeout(90, TimeUnit.SECONDS)      // 90s total (allows 1 full retry cycle)
+            // Call timeout: total budget for request+retry.
+            // Keep sufficiently high so a single retry can complete.
+            .callTimeout(120, TimeUnit.SECONDS)
             
             // DNS with fallback
             .dns(dns)

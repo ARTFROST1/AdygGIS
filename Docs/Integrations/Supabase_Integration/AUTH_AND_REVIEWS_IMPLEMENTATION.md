@@ -1,7 +1,7 @@
 # Auth & Reviews Implementation — Kotlin (AdyhyesKOTLIN)
 
-**Дата:** 6 января 2026  
-**Версия:** 1.2  
+**Дата:** 8 января 2026  
+**Версия:** 1.3  
 **Статус:** ✅ Реализовано и проверено
 
 ---
@@ -11,7 +11,7 @@
 Реализация модуля авторизации пользователей и отзывов с модерацией для Android-приложения AdyhyesKOTLIN. Архитектура аналогична React Native версии (AdygGIS-RN), но адаптирована под нативный Android с использованием:
 
 - **Retrofit + OkHttp** для REST API вызовов к Supabase GoTrue
-- **DataStore** для персистентного хранения сессии
+- **EncryptedSharedPreferences (AndroidX Security Crypto)** для безопасного хранения сессии
 - **Hilt** для DI
 - **Jetpack Compose** для UI
 
@@ -45,7 +45,7 @@
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │                           Data Layer                                    │ │
 │  │  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────┐ │ │
-│  │  │  AuthRepository     │  │  ReviewRepository   │  │  DataStore      │ │ │
+│  │  │  AuthRepository     │  │  ReviewRepository   │  │  Secure prefs  │ │ │
 │  │  │  ───────────────    │  │  ────────────────   │  │  ─────────      │ │ │
 │  │  │  • signIn()         │  │  • submitReview()   │  │  • auth_prefs   │ │ │
 │  │  │  • signUp()         │  │  • refreshReviews() │  │  • session      │ │ │
@@ -82,8 +82,10 @@ app/src/main/java/com/adygyes/app/
 ├── data/
 │   ├── local/
 │   │   └── preferences/
-│   │       └── AuthPreferencesManager.kt    # Session persistence via DataStore
+│   │       ├── AuthPreferencesManager.kt    # Legacy (DataStore) — не используется в актуальной auth цепочке
+│   │       └── SecureAuthPreferencesManager.kt # EncryptedSharedPreferences (актуально)
 │   ├── remote/
+│   │   ├── TokenAuthenticator.kt            # 401 refresh + proactive refresh interceptor
 │   │   ├── api/
 │   │   │   ├── SupabaseApiService.kt        # REST API (attractions, reviews)
 │   │   │   └── SupabaseAuthApi.kt           # GoTrue Auth API
@@ -192,16 +194,24 @@ app/src/main/java/com/adygyes/app/
 
 ### Session Persistence
 
-- **DataStore** используется для хранения:
+- **SecureAuthPreferencesManager** используется для хранения:
   - `access_token` — JWT токен для API запросов
   - `refresh_token` — токен для обновления сессии
+   - `token_expires_at` — время истечения access token (для проактивного refresh)
   - `user_id`, `user_email`, `user_display_name`, `user_avatar_url`
+
+> Примечание: если EncryptedSharedPreferences не может быть инициализирован (редкие device/keystore проблемы), сессия хранится **только в памяти процесса** (без plaintext persistence).
 
 - При старте приложения:
   1. `AuthRepository.init()` проверяет наличие сохранённой сессии
-  2. Если токен есть — пробует `refreshToken()`
-  3. При успехе — `AuthState.Authenticated`
-  4. При ошибке — очищает сессию, `AuthState.Unauthenticated`
+   2. Если токен истёк — пробует `refreshToken()` (иначе logout)
+   3. Если токен скоро истечёт — делает проактивный refresh (ошибка не выкидывает пользователя, если текущий токен ещё валиден)
+   4. При успехе — `AuthState.Authenticated`, при фатальной ошибке — очищает сессию
+
+### Авто-refresh на сетевом уровне
+
+- **ProactiveTokenRefreshInterceptor**: обновляет токен до запроса, если он скоро истечёт (только для user JWT запросов)
+- **TokenAuthenticator (OkHttp Authenticator)**: при `401 Unauthorized` пытается обновить токен и повторить запрос (1 retry, защита от циклов)
 
 ---
 
@@ -305,7 +315,6 @@ Features:
 ### WriteReviewModal Integration
 
 - При клике на "Оставить отзыв":
-- При клике на "Оставить отзыв":
    1. `ReviewViewModel.canWriteReview()` проверяет auth
    2. Если не авторизован → `showAuthRequired` → показывается `AuthModal`
    3. После успешного входа → автоматически открывается `WriteReviewModal`
@@ -332,17 +341,32 @@ Features:
 ## ✅ Чеклист готовности
 
 - [x] AuthRepository — sign in/up/out, token refresh
-- [x] AuthPreferencesManager — session persistence
+- [x] SecureAuthPreferencesManager — encrypted session persistence
+- [x] TokenAuthenticator / ProactiveTokenRefreshInterceptor — auto refresh (401 + proactive)
 - [x] SupabaseAuthApi — Retrofit interface
 - [x] AuthModule — Hilt DI
 - [x] AuthViewModel — UI state management
-- [x] AuthModal — Compose UI (login/register/reset)
+- [x] AuthModal — Compose UI (login/register/reset) + password strength
 - [x] ReviewRepository — submit review with auth
 - [x] ReviewViewModel — canWriteReview() auth check
 - [x] SettingsScreen — account section
 - [x] AttractionDetailScreen — auth integration
 - [x] AttractionBottomSheet — auth integration
 - [x] Build successful ✅
+
+---
+
+## ✅ Реализовано (фактическое состояние на 2026-01-08)
+
+- Secure session storage: EncryptedSharedPreferences (SecureAuthPreferencesManager)
+- Token lifecycle: expires_at + проактивный refresh + refresh при 401
+- AuthModal UX: debounce на отправку, нормальная email-валидация, индикатор силы пароля при регистрации
+- Reviews: offline-first + moderation (pending/approved/rejected) + optimistic reactions
+
+## ⏳ В планах (не реализовано в коде)
+
+- Миграция старой DataStore-сессии в SecureAuthPreferencesManager (чтобы не требовать перелогин после обновления)
+- Дополнительные UX подсказки/обработка offline сценариев именно для Auth экрана (явные сообщения при отсутствии сети)
 
 ---
 
@@ -385,13 +409,13 @@ Features:
 **Проблема:** `uid does not have ACCESS_COARSE_LOCATION or ACCESS_FINE_LOCATION`  
 **Причина:** Permission объявлен в манифесте, но не запрашивается runtime  
 **Решение:** Добавлен `LaunchedEffect` в `MapScreen.kt` для автоматического запроса permissions при старте  
-**Файл:** [MapScreen.kt#L164-L168](../app/src/main/java/com/adygyes/app/presentation/ui/screens/map/MapScreen.kt#L164-L168)
+**Файл:** [MapScreen.kt#L164-L168](../../../app/src/main/java/com/adygyes/app/presentation/ui/screens/map/MapScreen.kt#L164-L168)
 
 #### 2. Tombstones Timeout (SocketTimeoutException)
 **Проблема:** Запрос `sync_metadata` timeout 30 секунд при старте  
-**Причина:** Слишком большой `readTimeout` для необязательного запроса  
-**Решение:** Уменьшен timeout: `connectTimeout: 15s`, `readTimeout: 10s` (было 30s)  
-**Файл:** [NetworkModule.kt#L112-L114](../app/src/main/java/com/adygyes/app/di/module/NetworkModule.kt#L112-L114)
+**Причина:** Неправильный бюджет таймаутов мог приводить к долгим ожиданиям/повторам на слабой сети  
+**Решение:** Введён общий бюджет `callTimeout` и настроены таймауты клиента (актуально по коду: `connectTimeout: 15s`, `readTimeout: 25s`, `writeTimeout: 15s`, `callTimeout: 120s`)  
+**Файл:** [NetworkModule.kt](../../../app/src/main/java/com/adygyes/app/di/module/NetworkModule.kt)
 
 #### 3. Marker Images JobCancellationException
 **Проблема:** `JobCancellationException` при загрузке изображений маркеров  
@@ -401,22 +425,22 @@ Features:
 - Отдельная обработка `CancellationException` (не логируется как error)  
 - Поддержка передачи lifecycle-aware scope в `VisualMarkerProvider`  
 **Файлы:**  
-- [VisualMarkerProvider.kt#L745-L801](../app/src/main/java/com/adygyes/app/presentation/ui/map/markers/VisualMarkerProvider.kt#L745-L801)  
-- [ImageCacheManager.kt#L137-L141](../app/src/main/java/com/adygyes/app/data/local/cache/ImageCacheManager.kt#L137-L141)
+- [VisualMarkerProvider.kt#L745-L801](../../../app/src/main/java/com/adygyes/app/presentation/ui/map/markers/VisualMarkerProvider.kt#L745-L801)  
+- [ImageCacheManager.kt#L137-L141](../../../app/src/main/java/com/adygyes/app/data/local/cache/ImageCacheManager.kt#L137-L141)
 
 #### 4. Review Loading JobCancellationException
 **Проблема:** `Failed to load reviews` с `JobCancellationException`  
 **Причина:** Coroutine отменяется при закрытии bottom sheet / navigation  
 **Решение:** Добавлена обработка `CancellationException` в `ReviewViewModel.loadReviews()`  
-**Файл:** [ReviewViewModel.kt#L79-L95](../app/src/main/java/com/adygyes/app/presentation/viewmodel/ReviewViewModel.kt#L79-L95)
+**Файл:** [ReviewViewModel.kt#L79-L95](../../../app/src/main/java/com/adygyes/app/presentation/viewmodel/ReviewViewModel.kt#L79-L95)
 
 #### 5. Sign Up MissingFieldException
 **Проблема:** `MissingFieldException: Fields [access_token, refresh_token, user] are required`  
 **Причина:** Supabase иногда возвращает 200 OK с error payload (не 4xx), десериализация падает  
 **Решение:** Обработка `SerializationException` при десериализации `AuthResponse` — если ошибка, парсим как error response  
 **Файлы:**  
-- [AuthRepository.kt#L132-L164](../app/src/main/java/com/adygyes/app/data/repository/AuthRepository.kt#L132-L164) — `signUp()`  
-- [AuthRepository.kt#L97-L122](../app/src/main/java/com/adygyes/app/data/repository/AuthRepository.kt#L97-L122) — `signIn()`
+- [AuthRepository.kt#L132-L164](../../../app/src/main/java/com/adygyes/app/data/repository/AuthRepository.kt#L132-L164) — `signUp()`  
+- [AuthRepository.kt#L97-L122](../../../app/src/main/java/com/adygyes/app/data/repository/AuthRepository.kt#L97-L122) — `signIn()`
 
 #### 6. Review Submission RLS Error (Missing user_id)
 **Проблема:** Отзыв не отправляется, RLS policy violation при INSERT  
@@ -426,15 +450,15 @@ Features:
 - При создании отзыва передаётся `authState.user.id`
 - `body` сделан non-nullable (в БД это NOT NULL)  
 **Файлы:**  
-- [CreateReviewDto.kt](../app/src/main/java/com/adygyes/app/data/remote/dto/CreateReviewDto.kt)  
-- [ReviewRepository.kt#L202-L210](../app/src/main/java/com/adygyes/app/data/repository/ReviewRepository.kt#L202-L210)
+- [CreateReviewDto.kt](../../../app/src/main/java/com/adygyes/app/data/remote/dto/CreateReviewDto.kt)  
+- [ReviewRepository.kt#L202-L210](../../../app/src/main/java/com/adygyes/app/data/repository/ReviewRepository.kt#L202-L210)
 
 #### 7. Missing Success Toast for Review Submission
 **Проблема:** После успешной отправки отзыва пользователь не получал обратную связь  
 **Решение:** Добавлен Toast "Отзыв отправлен на модерацию" после успешной отправки  
 **Файлы:**  
-- [AttractionBottomSheet.kt](../app/src/main/java/com/adygyes/app/presentation/ui/components/AttractionBottomSheet.kt)  
-- [AttractionDetailScreen.kt](../app/src/main/java/com/adygyes/app/presentation/ui/screens/detail/AttractionDetailScreen.kt)
+- [AttractionBottomSheet.kt](../../../app/src/main/java/com/adygyes/app/presentation/ui/components/AttractionBottomSheet.kt)  
+- [AttractionDetailScreen.kt](../../../app/src/main/java/com/adygyes/app/presentation/ui/screens/detail/AttractionDetailScreen.kt)
 
 #### 8. Review Reactions System (v1.2)
 **Дата:** 6 января 2026  
@@ -480,17 +504,17 @@ Features:
 
 **Файлы:**
 - Database: migrations (review_reactions, likes_count/dislikes_count, trigger, RLS)
-- [ReviewReactionDto.kt](../app/src/main/java/com/adygyes/app/data/remote/dto/ReviewReactionDto.kt)
-- [SupabaseApiService.kt](../app/src/main/java/com/adygyes/app/data/remote/SupabaseApiService.kt#upsertReviewReaction)
-- [Review.kt](../app/src/main/java/com/adygyes/app/domain/model/Review.kt)
-- [ReviewRepository.kt](../app/src/main/java/com/adygyes/app/data/repository/ReviewRepository.kt#reactToReview)
-- [ReviewViewModel.kt](../app/src/main/java/com/adygyes/app/presentation/viewmodel/ReviewViewModel.kt#userOwnReviews)
-- [StatusBadge.kt](../app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/StatusBadge.kt)
-- [ReviewSection.kt](../app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/ReviewSection.kt#userOwnReviews)
-- [ReviewCard.kt](../app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/ReviewCard.kt#userReaction)
-- [WriteReviewModal.kt](../app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/WriteReviewModal.kt#stars)
-- [AttractionDetailScreen.kt](../app/src/main/java/com/adygyes/app/presentation/ui/screens/detail/AttractionDetailScreen.kt#userOwnReviews)
-- [AttractionBottomSheet.kt](../app/src/main/java/com/adygyes/app/presentation/ui/components/AttractionBottomSheet.kt#userOwnReviews)
+- [ReviewReactionDto.kt](../../../app/src/main/java/com/adygyes/app/data/remote/dto/ReviewReactionDto.kt)
+- [SupabaseApiService.kt](../../../app/src/main/java/com/adygyes/app/data/remote/api/SupabaseApiService.kt)
+- [Review.kt](../../../app/src/main/java/com/adygyes/app/domain/model/Review.kt)
+- [ReviewRepository.kt](../../../app/src/main/java/com/adygyes/app/data/repository/ReviewRepository.kt)
+- [ReviewViewModel.kt](../../../app/src/main/java/com/adygyes/app/presentation/viewmodel/ReviewViewModel.kt)
+- [StatusBadge.kt](../../../app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/StatusBadge.kt)
+- [ReviewSection.kt](../../../app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/ReviewSection.kt)
+- [ReviewCard.kt](../../../app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/ReviewCard.kt)
+- [WriteReviewModal.kt](../../../app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/WriteReviewModal.kt)
+- [AttractionDetailScreen.kt](../../../app/src/main/java/com/adygyes/app/presentation/ui/screens/detail/AttractionDetailScreen.kt)
+- [AttractionBottomSheet.kt](../../../app/src/main/java/com/adygyes/app/presentation/ui/components/AttractionBottomSheet.kt)
 
 ---
 

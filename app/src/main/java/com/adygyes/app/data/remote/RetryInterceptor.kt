@@ -1,7 +1,5 @@
 package com.adygyes.app.data.remote
 
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
 import timber.log.Timber
@@ -33,17 +31,13 @@ class RetryInterceptor(
         var currentDelay = initialDelayMs
         var lastException: IOException? = null
         
-        val startTime = System.currentTimeMillis()
-        
         for (attempt in 0..maxRetries) {
             try {
                 if (attempt > 0) {
                     Timber.d("🔄 Retry attempt $attempt/$maxRetries for ${request.url} (delay: ${currentDelay}ms)")
                     
-                    // Exponential backoff delay
-                    runBlocking {
-                        delay(currentDelay)
-                    }
+                    // Exponential backoff delay (do not use runBlocking in OkHttp interceptor)
+                    Thread.sleep(currentDelay)
                     
                     // Increase delay for next retry
                     currentDelay = (currentDelay * backoffMultiplier).toLong()
@@ -74,8 +68,7 @@ class RetryInterceptor(
                 
             } catch (e: SocketTimeoutException) {
                 lastException = e
-                val elapsed = System.currentTimeMillis() - startTime
-                Timber.w("⏱️ Request timeout after ${elapsed}ms (attempt ${attempt + 1}/${maxRetries + 1}): ${e.message}")
+                Timber.w("⏱️ Request timeout (attempt ${attempt + 1}/${maxRetries + 1}): ${e.message}")
                 if (attempt >= maxRetries) throw e
                 
             } catch (e: UnknownHostException) {

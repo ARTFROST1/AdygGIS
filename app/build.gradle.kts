@@ -205,6 +205,7 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.datastore.preferences)
+    implementation(libs.security.crypto)
     
     // Image Loading
     implementation(libs.coil.compose)

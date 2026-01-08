@@ -86,10 +86,10 @@ RetryInterceptor:
 ### 8. ✅ Таймауты
 ```kotlin
 OkHttpClient:
-  ✓ connectTimeout: 30s (было 15s)
-  ✓ readTimeout: 45s (было 10s) ⭐
-  ✓ writeTimeout: 30s (было 15s)
-  ✓ callTimeout: 90s (новое)
+  ✓ connectTimeout: 15s
+  ✓ readTimeout: 25s (было 10s)
+  ✓ writeTimeout: 15s
+  ✓ callTimeout: 120s (новое)
 ```
 
 ### 9. ✅ Network Checks
@@ -150,7 +150,7 @@ Connection pooling:
 
 ```
 Документация ↔ Код:
-  ✓ Таймауты совпадают (30s/45s/30s/90s)
+  ✓ Таймауты совпадают (15s/25s/15s/120s)
   ✓ Retry параметры совпадают (3 попытки, 1s delay)
   ✓ Имена файлов корректные
   ✓ Примеры кода актуальные

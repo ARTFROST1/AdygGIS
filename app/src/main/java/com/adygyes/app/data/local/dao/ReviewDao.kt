@@ -125,6 +125,13 @@ interface ReviewDao {
         WHERE id = :reviewId
     """)
     suspend fun updateReaction(reviewId: String, reaction: String?, likesCount: Int, dislikesCount: Int)
+
+    /**
+     * Update only the user's reaction without touching counts.
+     * Useful when syncing per-user reactions from server.
+     */
+    @Query("UPDATE reviews SET userReaction = :reaction WHERE id = :reviewId")
+    suspend fun updateUserReactionOnly(reviewId: String, reaction: String?)
     
     // ========== Deletes ==========
     
@@ -250,6 +257,17 @@ interface ReviewDao {
         WHERE id IN (:ids)
     """)
     suspend fun getLocalStatesForIds(ids: List<String>): List<ReviewLocalState>
+
+    /**
+     * Fetch current cached userReaction for a set of review IDs.
+     * Used to avoid N queries when reconciling reactions from the server.
+     */
+    @Query("""
+        SELECT id, userReaction
+        FROM reviews
+        WHERE id IN (:ids)
+    """)
+    suspend fun getCachedReactionsForIds(ids: List<String>): List<ReviewReactionState>
 }
 
 data class ReviewLocalState(
@@ -257,4 +275,9 @@ data class ReviewLocalState(
     val isOwnReview: Boolean,
     val userReaction: String?,
     val rejectionReason: String?
+)
+
+data class ReviewReactionState(
+    val id: String,
+    val userReaction: String?
 )

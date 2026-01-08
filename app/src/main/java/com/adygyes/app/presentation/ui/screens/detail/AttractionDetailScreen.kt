@@ -42,6 +42,7 @@ import com.adygyes.app.domain.model.ReviewSortOption
 import com.adygyes.app.presentation.theme.Dimensions
 import com.adygyes.app.presentation.ui.components.*
 import com.adygyes.app.presentation.ui.components.auth.AuthModal
+import com.adygyes.app.presentation.viewmodel.PasswordStrength
 import com.adygyes.app.presentation.ui.components.reviews.ReviewSection
 import com.adygyes.app.presentation.ui.components.reviews.WriteReviewModal
 import com.adygyes.app.presentation.viewmodel.AttractionDetailViewModel
@@ -76,6 +77,7 @@ fun AttractionDetailScreen(
     val reviews by reviewViewModel.reviews.collectAsStateWithLifecycle()
     val userOwnReviews by reviewViewModel.userOwnReviews.collectAsStateWithLifecycle()
     val reviewsLoading by reviewViewModel.loading.collectAsStateWithLifecycle()
+    val reviewsSyncing by reviewViewModel.isSyncing.collectAsStateWithLifecycle()
     val reviewSortBy by reviewViewModel.sortBy.collectAsStateWithLifecycle()
     val submitting by reviewViewModel.submitting.collectAsStateWithLifecycle()
     val errorMessage by reviewViewModel.error.collectAsStateWithLifecycle()
@@ -393,10 +395,17 @@ fun AttractionDetailScreen(
                                 }
                                 // If not authenticated, showAuthRequired will trigger AuthModal
                             },
-                            onLike = { reviewViewModel.reactToReview(it, true) },
-                            onDislike = { reviewViewModel.reactToReview(it, false) },
+                            onLike = { reviewId ->
+                                android.util.Log.d("AttractionDetailScreen", "🔗 onLike lambda called: $reviewId")
+                                reviewViewModel.reactToReview(reviewId, true)
+                            },
+                            onDislike = { reviewId ->
+                                android.util.Log.d("AttractionDetailScreen", "🔗 onDislike lambda called: $reviewId")
+                                reviewViewModel.reactToReview(reviewId, false)
+                            },
                             onShare = { /* TODO: Share review */ },
-                            loading = reviewsLoading
+                            loading = reviewsLoading,
+                            isSyncing = reviewsSyncing
                         )
                     }
                 }
@@ -429,11 +438,14 @@ fun AttractionDetailScreen(
             )
             
             // Auth Modal for review
+            var authPasswordStrength by remember { mutableStateOf(PasswordStrength.NONE) }
+            
             AuthModal(
                 visible = showAuthModal,
                 onClose = { 
                     showAuthModal = false
                     authViewModel.clearError()
+                    authPasswordStrength = PasswordStrength.NONE
                 },
                 onSignIn = { email, password -> 
                     authViewModel.signIn(email, password) 
@@ -446,7 +458,11 @@ fun AttractionDetailScreen(
                 },
                 isLoading = authUiState.isLoading,
                 errorMessage = authUiState.error,
-                onClearError = { authViewModel.clearError() }
+                onClearError = { authViewModel.clearError() },
+                passwordStrength = authPasswordStrength,
+                onPasswordChange = { password ->
+                    authPasswordStrength = authViewModel.calculatePasswordStrength(password)
+                }
             )
         }
     }

@@ -107,6 +107,7 @@ fun AttractionBottomSheet(
     val userOwnReviews by reviewViewModel.userOwnReviews.collectAsState()
     val sortBy by reviewViewModel.sortBy.collectAsState()
     val loading by reviewViewModel.loading.collectAsState()
+    val isSyncing by reviewViewModel.isSyncing.collectAsState()
     val submitting by reviewViewModel.submitting.collectAsState()
     val errorMessage by reviewViewModel.error.collectAsState()
     val submitSuccess by reviewViewModel.submitSuccess.collectAsState()
@@ -461,10 +462,17 @@ fun AttractionBottomSheet(
                         showWriteReviewModal = true
                     }
                 },
-                onLike = { reviewId -> reviewViewModel.reactToReview(reviewId, true) },
-                onDislike = { reviewId -> reviewViewModel.reactToReview(reviewId, false) },
+                onLike = { reviewId -> 
+                    android.util.Log.d("AttractionBottomSheet", "🔗 onLike lambda called: $reviewId")
+                    reviewViewModel.reactToReview(reviewId, true) 
+                },
+                onDislike = { reviewId -> 
+                    android.util.Log.d("AttractionBottomSheet", "🔗 onDislike lambda called: $reviewId")
+                    reviewViewModel.reactToReview(reviewId, false) 
+                },
                 onShare = { reviewId -> /* TODO: Share review */ },
-                loading = loading
+                loading = loading,
+                isSyncing = isSyncing
             )
             
             Spacer(modifier = Modifier.height(32.dp))

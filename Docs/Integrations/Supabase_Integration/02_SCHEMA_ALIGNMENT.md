@@ -118,10 +118,10 @@ CREATE TABLE attractions (
   images TEXT[] DEFAULT '{}',
   
   -- Details
-  rating DECIMAL(2,1) CHECK (rating >= 0 AND rating <= 5),
-    -- Reviews aggregate (нужно, если включаем UI отзывов)
-    reviews_count INTEGER DEFAULT 0,
-    average_rating DECIMAL(2,1) CHECK (average_rating >= 0 AND average_rating <= 5),
+  -- Reviews aggregate (актуально)
+  -- rating (legacy) удалён миграцией 2026-01-07; используем average_rating
+  reviews_count INTEGER DEFAULT 0,
+  average_rating DECIMAL(2,1) CHECK (average_rating >= 0 AND average_rating <= 5),
   working_hours TEXT,
   phone_number TEXT,
   email TEXT,

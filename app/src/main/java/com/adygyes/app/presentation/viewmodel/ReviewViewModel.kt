@@ -6,6 +6,7 @@ import com.adygyes.app.data.repository.AuthRepository
 import com.adygyes.app.data.repository.ReviewRepository
 import com.adygyes.app.domain.model.AuthState
 import com.adygyes.app.domain.model.Review
+import com.adygyes.app.domain.model.ReviewReaction
 import com.adygyes.app.domain.model.ReviewSortOption
 import com.adygyes.app.domain.model.ReviewSubmission
 import com.adygyes.app.domain.model.isAuthenticated
@@ -37,8 +38,13 @@ class ReviewViewModel @Inject constructor(
     private val _userOwnReviews = MutableStateFlow<List<Review>>(emptyList())
     val userOwnReviews: StateFlow<List<Review>> = _userOwnReviews.asStateFlow()
     
+    // Loading state: true ONLY when no cached data and fetching from network
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
+    
+    // Background sync indicator: shows subtle indicator that sync is happening
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
     
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
@@ -67,23 +73,35 @@ class ReviewViewModel @Inject constructor(
     
     private var currentAttractionId: String? = null
     
+    // Job for background sync to allow cancellation
+    private var syncJob: kotlinx.coroutines.Job? = null
+    
     /**
      * Load reviews for an attraction.
      * 
-     * Strategy:
-     * 1. INSTANT: Load from Room cache immediately (no loading spinner)
-     * 2. BACKGROUND: Delta sync to check for updates
-     * 3. UPDATE: If new data found, update UI seamlessly
+     * OFFLINE-FIRST STRATEGY (Best Practices):
+     * 1. INSTANT DISPLAY: Show cached reviews from Room immediately (NO loading spinner)
+     * 2. BACKGROUND SYNC: Fetch updates from server in background (doesn't block UI)
+     * 3. SEAMLESS UPDATE: If new data arrives, update UI smoothly without flickering
+     * 4. GRACEFUL FALLBACK: If network fails, keep showing cached data
+     * 
+     * Loading spinner is shown ONLY when:
+     * - Cache is empty AND we're fetching from network for the first time
      */
     fun loadReviews(attractionId: String, forceRefresh: Boolean = false) {
+        // Cancel previous sync job if switching attractions
+        if (currentAttractionId != attractionId) {
+            syncJob?.cancel()
+        }
+        
         // Skip reload if same attraction and already have data (unless forceRefresh)
         if (!forceRefresh && currentAttractionId == attractionId && _reviews.value.isNotEmpty()) {
-            // Still refresh user's own reviews in background
+            // Still refresh user's own reviews in background (non-blocking)
             if (isAuthenticated.value) {
                 viewModelScope.launch {
                     reviewRepository.refreshUserOwnReviews(attractionId)
                     _userOwnReviews.value = reviewRepository.userOwnReviews.value
-                    Timber.d("Refreshed user own reviews (cached path), count=${_userOwnReviews.value.size}")
+                    Timber.d("🔄 Background refresh user own reviews, count=${_userOwnReviews.value.size}")
                 }
             }
             return
@@ -94,59 +112,144 @@ class ReviewViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                // Check if user already reviewed this attraction
-                checkUserReviewed(attractionId)
+                // ═══════════════════════════════════════════════════════════
+                // PHASE 1: INSTANT CACHE DISPLAY (no network, no waiting)
+                // ═══════════════════════════════════════════════════════════
                 
-                // CRITICAL: Load user's own reviews FIRST before public reviews
-                // This ensures proper filtering to avoid duplicates
+                var userReviewIds: Set<String> = emptySet()
+                var hasAnyCachedContent = false
+                
+                // Load user's own reviews from cache FIRST (before public reviews)
                 if (isAuthenticated.value) {
-                    reviewRepository.refreshUserOwnReviews(attractionId)
-                    _userOwnReviews.value = reviewRepository.userOwnReviews.value
-                    Timber.d("Loaded user own reviews, count=${_userOwnReviews.value.size}, statuses=${_userOwnReviews.value.map { it.status }}")
-                } else {
-                    _userOwnReviews.value = emptyList()
+                    val cachedOwnReviews = reviewRepository.getUserOwnReviewsFromCache(attractionId)
+                    if (cachedOwnReviews.isNotEmpty()) {
+                        _userOwnReviews.value = cachedOwnReviews
+                        userReviewIds = cachedOwnReviews.map { it.id }.toSet()
+                        hasAnyCachedContent = true
+                        Timber.d("📦 INSTANT: ${cachedOwnReviews.size} own reviews from cache")
+                    }
                 }
                 
-                // Get current user ID for filtering
-                val currentUserId = if (isAuthenticated.value) {
-                    reviewRepository.getCurrentUserId()
-                } else null
+                // Load public reviews from cache INSTANTLY (Room is fast)
+                val cachedReviews = reviewRepository.getReviewsFromCacheOnly(attractionId)
+                val filteredCachedReviews = cachedReviews.filter { it.id !in userReviewIds }
                 
-                // INSTANT: Load from cache immediately (no loading indicator)
-                val cachedReviews = reviewRepository.getReviewsOfflineFirst(attractionId)
-                if (cachedReviews.isNotEmpty()) {
-                    val userReviewIds = _userOwnReviews.value.map { it.id }.toSet()
-                    _reviews.value = cachedReviews.filter { it.id !in userReviewIds }
-                    Timber.d("📦 INSTANT: Displayed ${_reviews.value.size} cached reviews")
+                if (filteredCachedReviews.isNotEmpty()) {
+                    _reviews.value = sortReviewsLocally(filteredCachedReviews, _sortBy.value)
+                    hasAnyCachedContent = true
+                    Timber.d("📦 INSTANT: ${_reviews.value.size} public reviews from cache (no loading spinner)")
+                }
+
+                if (hasAnyCachedContent) {
+                    // If we can show something instantly (own reviews and/or public), never block UI.
+                    _loading.value = false
                 } else {
-                    // No cache - show loading only when fetching fresh data
+                    // Only show loading if NOTHING is cached (no own reviews and no public reviews).
                     _loading.value = true
+                    Timber.d("⏳ No cache content, showing loading spinner")
                 }
                 
-                // BACKGROUND: Delta sync to check for updates
-                reviewRepository.backgroundSyncReviews(attractionId, excludeUserId = currentUserId)
+                // Check hasUserReviewed from cache (fast, no network)
+                checkUserReviewedFromCache(attractionId)
                 
-                // Observe updated reviews from repository
-                reviewRepository.getReviewsForAttraction(attractionId, _sortBy.value)
-                    .collect { allReviews ->
-                        val userReviewIds = _userOwnReviews.value.map { it.id }.toSet()
-                        _reviews.value = allReviews.filter { it.id !in userReviewIds }
+                // ═══════════════════════════════════════════════════════════
+                // PHASE 2: BACKGROUND SYNC (non-blocking, updates UI when done)
+                // ═══════════════════════════════════════════════════════════
+                
+                syncJob = viewModelScope.launch {
+                    _isSyncing.value = true
+                    
+                    try {
+                        val currentUserId = if (isAuthenticated.value) {
+                            reviewRepository.getCurrentUserId()
+                        } else null
+                        
+                        // Sync user's own reviews in background
+                        if (isAuthenticated.value) {
+                            reviewRepository.refreshUserOwnReviews(attractionId)
+                            val updatedOwnReviews = reviewRepository.userOwnReviews.value
+                            if (updatedOwnReviews != _userOwnReviews.value) {
+                                _userOwnReviews.value = updatedOwnReviews
+                                Timber.d("✅ SYNC: Updated ${updatedOwnReviews.size} own reviews")
+                            }
+                        }
+
+                        // Build current own-review IDs for filtering public reviews.
+                        userReviewIds = _userOwnReviews.value.map { it.id }.toSet()
+                        
+                        // Background delta sync for public reviews
+                        val didSync = reviewRepository.performBackgroundSync(attractionId, excludeUserId = currentUserId)
+                        
+                        if (didSync) {
+                            // Reload from cache after sync
+                            val updatedReviews = reviewRepository.getReviewsFromCacheOnly(attractionId)
+                            val filteredUpdatedReviews = updatedReviews.filter { it.id !in userReviewIds }
+                            
+                            if (filteredUpdatedReviews != _reviews.value) {
+                                _reviews.value = sortReviewsLocally(filteredUpdatedReviews, _sortBy.value)
+                                Timber.d("✅ SYNC: UI updated with ${_reviews.value.size} reviews")
+                            }
+                        }
+                        
+                        // Recheck hasUserReviewed after sync (cache-only; own reviews are already refreshed)
+                        checkUserReviewedFromCache(attractionId)
+                        
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        Timber.d("🚫 Background sync cancelled")
+                        throw e
+                    } catch (e: Exception) {
+                        // Network error during background sync - don't show error if we have cached data
+                        if (_reviews.value.isEmpty()) {
+                            _error.value = "Не удалось загрузить отзывы"
+                        }
+                        Timber.w(e, "⚠️ Background sync failed, keeping cached data")
+                    } finally {
+                        _isSyncing.value = false
                         _loading.value = false
                     }
+                }
+                
             } catch (e: kotlinx.coroutines.CancellationException) {
                 Timber.d("Review loading cancelled for attraction $attractionId")
                 _loading.value = false
+                _isSyncing.value = false
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load reviews for attraction $attractionId")
                 _error.value = e.message
                 _loading.value = false
+                _isSyncing.value = false
             }
         }
     }
     
     /**
-     * Check if user already reviewed this attraction
+     * Sort reviews locally without network call
+     */
+    private fun sortReviewsLocally(reviews: List<Review>, sortBy: ReviewSortOption): List<Review> {
+        return when (sortBy) {
+            ReviewSortOption.NEWEST -> reviews.sortedByDescending { it.createdAt }
+            ReviewSortOption.OLDEST -> reviews.sortedBy { it.createdAt }
+            ReviewSortOption.HIGHEST -> reviews.sortedByDescending { it.rating }
+            ReviewSortOption.LOWEST -> reviews.sortedBy { it.rating }
+            ReviewSortOption.DEFAULT -> {
+                reviews.sortedWith(
+                    compareByDescending<Review> { it.likesCount - it.dislikesCount }
+                        .thenByDescending { it.createdAt }
+                )
+            }
+        }
+    }
+    
+    /**
+     * Check if user already reviewed from cache (fast, no network)
+     */
+    private suspend fun checkUserReviewedFromCache(attractionId: String) {
+        _hasUserReviewed.value = reviewRepository.hasUserReviewedFromCache(attractionId)
+    }
+    
+    /**
+     * Check if user already reviewed this attraction (with network fallback)
      */
     private suspend fun checkUserReviewed(attractionId: String) {
         _hasUserReviewed.value = reviewRepository.hasUserReviewed(attractionId)
@@ -177,42 +280,91 @@ class ReviewViewModel @Inject constructor(
     }
     
     /**
-     * Change sort order
+     * Change sort order - applies locally without network call
      */
     fun setSortBy(newSortBy: ReviewSortOption) {
         _sortBy.value = newSortBy
-        currentAttractionId?.let { loadReviews(it) }
+        // Sort existing data locally (instant, no network) - create NEW list for StateFlow
+        if (_reviews.value.isNotEmpty()) {
+            _reviews.value = sortReviewsLocally(_reviews.value, newSortBy).toList()
+        }
     }
     
     /**
-     * React to a review (like/dislike with toggle logic)
+     * React to a review (like/dislike with toggle logic).
+     * REQUIRES AUTHENTICATION - shows auth modal if not logged in.
      */
     fun reactToReview(reviewId: String, isLike: Boolean) {
+        android.util.Log.d("ReviewViewModel", "🎯 reactToReview called: $reviewId, isLike=$isLike")
+        
+        // Check authentication first
         if (!authRepository.isCurrentlyAuthenticated()) {
-            _error.value = "Требуется авторизация"
+            android.util.Log.w("ReviewViewModel", "⚠️ User not authenticated - showing auth modal")
+            _showAuthRequired.value = true
             return
         }
         
+        // Find review
+        val currentReview = _reviews.value.find { it.id == reviewId }
+        if (currentReview == null) {
+            android.util.Log.e("ReviewViewModel", "❌ Review not found: $reviewId")
+            return
+        }
+        
+        val currentReaction = currentReview.userReaction
+        val desiredReaction = if (isLike) ReviewReaction.LIKE else ReviewReaction.DISLIKE
+        
+        // Calculate new state (toggle logic)
+        val newReaction: ReviewReaction
+        val newLikes: Int
+        val newDislikes: Int
+        
+        when {
+            currentReaction == desiredReaction -> {
+                // Same button → remove reaction
+                newReaction = ReviewReaction.NONE
+                newLikes = if (isLike) (currentReview.likesCount - 1).coerceAtLeast(0) else currentReview.likesCount
+                newDislikes = if (!isLike) (currentReview.dislikesCount - 1).coerceAtLeast(0) else currentReview.dislikesCount
+            }
+            currentReaction == ReviewReaction.NONE -> {
+                // No reaction → add new
+                newReaction = desiredReaction
+                newLikes = if (isLike) currentReview.likesCount + 1 else currentReview.likesCount
+                newDislikes = if (!isLike) currentReview.dislikesCount + 1 else currentReview.dislikesCount
+            }
+            else -> {
+                // Switch reaction
+                newReaction = desiredReaction
+                newLikes = if (isLike) currentReview.likesCount + 1 else (currentReview.likesCount - 1).coerceAtLeast(0)
+                newDislikes = if (!isLike) currentReview.dislikesCount + 1 else (currentReview.dislikesCount - 1).coerceAtLeast(0)
+            }
+        }
+        
+        // Update UI immediately
+        val updatedReview = currentReview.copy(
+            userReaction = newReaction,
+            likesCount = newLikes,
+            dislikesCount = newDislikes
+        )
+        
+        _reviews.value = _reviews.value.map { if (it.id == reviewId) updatedReview else it }.toList()
+        android.util.Log.d("ReviewViewModel", "⚡ UI UPDATED: $newReaction (likes=$newLikes, dislikes=$newDislikes)")
+        
+        // Background sync
         viewModelScope.launch {
             try {
-                val result = reviewRepository.reactToReview(reviewId, isLike)
-                when (result) {
-                    is com.adygyes.app.data.remote.NetworkResult.Success -> {
-                        Timber.d("Successfully reacted to review $reviewId")
-                        // Refresh both public reviews and user's own reviews to get updated counts
-                        // forceRefresh=true ensures proper re-filtering
-                        currentAttractionId?.let { attractionId ->
-                            loadReviews(attractionId, forceRefresh = true)
-                        }
-                    }
-                    is com.adygyes.app.data.remote.NetworkResult.Error -> {
-                        Timber.e("Failed to react to review: ${result.message}")
-                        _error.value = result.message
-                    }
-                }
+                reviewRepository.reactToReviewOptimistic(
+                    reviewId = reviewId,
+                    newReaction = newReaction,
+                    newLikesCount = newLikes,
+                    newDislikesCount = newDislikes,
+                    isLike = isLike,
+                    wasToggleOff = currentReaction == desiredReaction
+                )
+                android.util.Log.d("ReviewViewModel", "✅ Server synced")
             } catch (e: Exception) {
-                Timber.e(e, "Error reacting to review $reviewId")
-                _error.value = e.message
+                android.util.Log.e("ReviewViewModel", "⚠️ Sync failed: ${e.message}")
+                // Keep UI state - no rollback
             }
         }
     }
@@ -283,8 +435,12 @@ class ReviewViewModel @Inject constructor(
      * Clear reviews (e.g., when navigating away)
      */
     fun clearReviews() {
+        syncJob?.cancel()
         _reviews.value = emptyList()
+        _userOwnReviews.value = emptyList()
         _hasUserReviewed.value = false
+        _loading.value = false
+        _isSyncing.value = false
         currentAttractionId = null
     }
 }

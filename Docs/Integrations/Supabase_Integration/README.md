@@ -60,10 +60,10 @@
 - ✅ Обработка всех типов ошибок
 
 ### 3. Таймауты
-- ✅ Connect: 30s (было 15s)
-- ✅ Read: 45s (было 10s) ⭐ критично!
-- ✅ Write: 30s (было 15s)
-- ✅ Total: 90s (новое)
+- ✅ Connect: 15s
+- ✅ Read: 25s (было 10s)
+- ✅ Write: 15s
+- ✅ Total (callTimeout): 120s (общий бюджет для request+retry)
 
 ### 4. Оптимизации
 - ✅ Gzip compression

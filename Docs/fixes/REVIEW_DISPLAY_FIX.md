@@ -16,7 +16,7 @@
 
 ## Корневая причина проблемы с перезагрузкой
 
-**Проблема:** При открытии карточки достопримечательности вызывался `loadReviews()`, который проверял `isAuthenticated.value`. НО в момент вызова auth состояние было еще `AuthState.Unknown` или `AuthState.Loading`, так как восстановление сессии из DataStore происходит асинхронно.
+**Проблема:** При открытии карточки достопримечательности вызывался `loadReviews()`, который проверял `isAuthenticated.value`. НО в момент вызова auth состояние было еще `AuthState.Unknown` или `AuthState.Loading`, так как восстановление сессии выполняется асинхронно (текущая реализация — `SecureAuthPreferencesManager` на базе `EncryptedSharedPreferences`, без небезопасного plaintext fallback).
 
 **Результат:** Метод `refreshUserOwnReviews()` не вызывался, так как `isAuthenticated.value = false`.
 

@@ -376,7 +376,8 @@ app/
 - [x] Auth System (Supabase GoTrue)
   - [x] AuthRepository (signIn, signUp, signOut, refreshToken)
   - [x] AuthViewModel + AuthModal UI
-  - [x] AuthPreferencesManager (DataStore session persistence)
+    - [x] SecureAuthPreferencesManager (EncryptedSharedPreferences session persistence)
+    - [x] TokenAuthenticator + ProactiveTokenRefreshInterceptor (401 + proactive refresh)
   - [x] SupabaseAuthApi (Retrofit interface)
 - [x] Reviews System
   - [x] ReviewRepository (submitReview, refreshReviews, hasUserReviewed)

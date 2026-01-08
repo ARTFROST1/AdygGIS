@@ -1,5 +1,6 @@
 package com.adygyes.app.presentation.viewmodel
 
+import android.util.Patterns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adygyes.app.data.repository.AuthRepository
@@ -22,6 +23,11 @@ import javax.inject.Inject
 
 /**
  * ViewModel for managing authentication UI state and operations.
+ * 
+ * Improvements:
+ * - Better email validation using Android Patterns
+ * - Debounce protection against multiple submissions
+ * - Enhanced password validation with strength indicator
  */
 @HiltViewModel
 class AuthViewModel @Inject constructor(
@@ -46,10 +52,18 @@ class AuthViewModel @Inject constructor(
     private val _events = MutableSharedFlow<AuthEvent>()
     val events: SharedFlow<AuthEvent> = _events.asSharedFlow()
     
+    // Debounce protection
+    private var lastSubmitTime = 0L
+    private companion object {
+        const val DEBOUNCE_TIME_MS = 1000L
+        const val MIN_PASSWORD_LENGTH = 6
+    }
+    
     /**
      * Sign in with email and password
      */
     fun signIn(email: String, password: String) {
+        if (!canSubmit()) return
         if (!validateSignInInput(email, password)) return
         
         viewModelScope.launch {
@@ -76,6 +90,7 @@ class AuthViewModel @Inject constructor(
      * Sign up with email, password, and optional display name
      */
     fun signUp(email: String, password: String, displayName: String?) {
+        if (!canSubmit()) return
         if (!validateSignUpInput(email, password, displayName)) return
         
         viewModelScope.launch {
@@ -124,6 +139,8 @@ class AuthViewModel @Inject constructor(
      * Request password reset email
      */
     fun resetPassword(email: String) {
+        if (!canSubmit()) return
+        
         if (email.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "Введите email")
             return
@@ -162,7 +179,45 @@ class AuthViewModel @Inject constructor(
         authRepository.clearError()
     }
     
+    /**
+     * Calculate password strength for UI indicator
+     */
+    fun calculatePasswordStrength(password: String): PasswordStrength {
+        if (password.isEmpty()) return PasswordStrength.NONE
+        if (password.length < MIN_PASSWORD_LENGTH) return PasswordStrength.WEAK
+        
+        var score = 0
+        
+        // Length bonus
+        if (password.length >= 8) score++
+        if (password.length >= 12) score++
+        
+        // Character variety
+        if (password.any { it.isUpperCase() }) score++
+        if (password.any { it.isLowerCase() }) score++
+        if (password.any { it.isDigit() }) score++
+        if (password.any { !it.isLetterOrDigit() }) score++
+        
+        return when {
+            score >= 5 -> PasswordStrength.STRONG
+            score >= 3 -> PasswordStrength.MEDIUM
+            else -> PasswordStrength.WEAK
+        }
+    }
+    
     // ===== Validation helpers =====
+    
+    /**
+     * Debounce protection against multiple submissions
+     */
+    private fun canSubmit(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - lastSubmitTime < DEBOUNCE_TIME_MS) {
+            return false
+        }
+        lastSubmitTime = now
+        return true
+    }
     
     private fun validateSignInInput(email: String, password: String): Boolean {
         when {
@@ -178,8 +233,8 @@ class AuthViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(error = "Введите пароль")
                 return false
             }
-            password.length < 6 -> {
-                _uiState.value = _uiState.value.copy(error = "Пароль должен быть не менее 6 символов")
+            password.length < MIN_PASSWORD_LENGTH -> {
+                _uiState.value = _uiState.value.copy(error = "Пароль должен быть не менее $MIN_PASSWORD_LENGTH символов")
                 return false
             }
         }
@@ -197,9 +252,23 @@ class AuthViewModel @Inject constructor(
         return true
     }
     
+    /**
+     * Validate email using Android's built-in email pattern
+     * More reliable than simple @ and . check
+     */
     private fun isValidEmail(email: String): Boolean {
-        return email.contains("@") && email.contains(".") && email.length >= 5
+        return Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
     }
+}
+
+/**
+ * Password strength levels for UI indicator
+ */
+enum class PasswordStrength {
+    NONE,
+    WEAK,
+    MEDIUM,
+    STRONG
 }
 
 /**

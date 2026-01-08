@@ -260,7 +260,8 @@ Current offline-first data flow is implemented in these packages:
 
 **Preferences:**
 - `data/local/preferences/PreferencesManager.kt` - App preferences (DataStore)
-- `data/local/preferences/AuthPreferencesManager.kt` - Auth session persistence (DataStore)
+- `data/local/preferences/SecureAuthPreferencesManager.kt` - Auth session persistence (EncryptedSharedPreferences, актуально)
+- `data/local/preferences/AuthPreferencesManager.kt` - Legacy auth session persistence (DataStore, не используется в актуальной auth цепочке)
 
 ## Key Architecture Patterns
 
@@ -287,7 +288,8 @@ Current offline-first data flow is implemented in these packages:
   - AuthRepository с signIn, signUp, signOut, refreshToken
   - AuthViewModel для управления состоянием авторизации
   - AuthModal (Compose) - UI для входа/регистрации
-  - AuthPreferencesManager - персистентное хранение сессии
+  - SecureAuthPreferencesManager - encrypted хранение сессии + expires_at
+  - TokenAuthenticator/ProactiveTokenRefreshInterceptor - auto refresh (401 + проактивный)
   - Приложение работает без входа; Auth требуется только для отзывов
 
 - **⭐ Reviews System (Supabase):**

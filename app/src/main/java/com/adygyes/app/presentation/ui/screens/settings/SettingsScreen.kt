@@ -22,6 +22,7 @@ import com.adygyes.app.presentation.viewmodel.AuthEvent
 import com.adygyes.app.presentation.ui.components.RatingComingSoonDialog
 import com.adygyes.app.presentation.ui.components.auth.AuthModal
 import com.adygyes.app.domain.model.AuthState
+import com.adygyes.app.presentation.viewmodel.PasswordStrength
 import com.adygyes.app.domain.model.currentUser
 import android.widget.Toast
 import android.content.Intent
@@ -490,11 +491,14 @@ fun SettingsScreen(
     )
     
     // Auth Modal
+    var currentPasswordStrength by remember { mutableStateOf(PasswordStrength.NONE) }
+    
     AuthModal(
         visible = showAuthModal,
         onClose = { 
             showAuthModal = false 
             authViewModel.clearError()
+            currentPasswordStrength = PasswordStrength.NONE
         },
         onSignIn = { email, password -> 
             authViewModel.signIn(email, password) 
@@ -507,7 +511,11 @@ fun SettingsScreen(
         },
         isLoading = authUiState.isLoading,
         errorMessage = authUiState.error,
-        onClearError = { authViewModel.clearError() }
+        onClearError = { authViewModel.clearError() },
+        passwordStrength = currentPasswordStrength,
+        onPasswordChange = { password ->
+            currentPasswordStrength = authViewModel.calculatePasswordStrength(password)
+        }
     )
     
     // Sign Out Confirmation Dialog
