@@ -1,15 +1,18 @@
 package com.adygyes.app.data.repository
 
+import com.adygyes.app.data.local.dao.ReviewDao
+import com.adygyes.app.data.local.entities.ReviewEntity
 import com.adygyes.app.data.remote.NetworkResult
 import com.adygyes.app.data.remote.ReviewsRemoteDataSource
 import com.adygyes.app.data.remote.api.SupabaseApiService
 import com.adygyes.app.data.remote.dto.CreateReviewRequest
+import com.adygyes.app.data.remote.dto.ReviewDto
 import com.adygyes.app.domain.model.AuthState
 import com.adygyes.app.domain.model.Review
 import com.adygyes.app.domain.model.ReviewReaction
 import com.adygyes.app.domain.model.ReviewSortOption
+import com.adygyes.app.data.sync.ReviewSyncService
 import com.adygyes.app.domain.model.ReviewSubmission
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +27,7 @@ import javax.inject.Singleton
  * Repository for managing reviews.
  *
  * Features:
+ * - Offline-first: reads from Room cache, syncs with Supabase
  * - Reads: public approved reviews via Supabase RLS
  * - Writes: authenticated users can submit reviews (status='pending')
  * - User's own reviews: visible regardless of status when authenticated
@@ -32,8 +35,10 @@ import javax.inject.Singleton
 @Singleton
 class ReviewRepository @Inject constructor(
     private val reviewsRemoteDataSource: ReviewsRemoteDataSource,
+    private val reviewDao: ReviewDao,
     private val supabaseApi: SupabaseApiService,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val reviewSyncService: ReviewSyncService
 ) {
 
     private val _reviews = MutableStateFlow<Map<String, List<Review>>>(emptyMap())
@@ -46,54 +51,6 @@ class ReviewRepository @Inject constructor(
     private val _isSubmitting = MutableStateFlow(false)
     val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
 
-    // Mock data (offline/demo fallback only)
-    private val mockReviewsTemplate = listOf(
-        Review(
-            id = "r1",
-            attractionId = "",
-            authorId = "u1",
-            authorName = "Иван Петров",
-            authorBadge = "Знаток города 5 уровня",
-            rating = 5,
-            text = "Потрясающее место! Виды невероятные, особенно на рассвете. Тропа хорошо размечена, но требует хорошей физической подготовки.",
-            createdAt = Instant.now().minus(9, ChronoUnit.DAYS),
-            likesCount = 12,
-            dislikesCount = 1
-        ),
-        Review(
-            id = "r2",
-            attractionId = "",
-            authorId = "u2",
-            authorName = "Мария Сидорова",
-            authorBadge = "Путешественник",
-            rating = 4,
-            text = "Красивые виды, но подъём действительно сложный. Советую брать с собой много воды.",
-            createdAt = Instant.now().minus(12, ChronoUnit.DAYS),
-            likesCount = 8,
-            dislikesCount = 0
-        ),
-        Review(
-            id = "r3",
-            attractionId = "",
-            authorId = "u3",
-            authorName = "Алексей Краснов",
-            rating = 5,
-            text = "Были всей семьёй, дети в восторге! Обязательно вернёмся ещё.",
-            createdAt = Instant.now().minus(17, ChronoUnit.DAYS),
-            likesCount = 15,
-            dislikesCount = 2
-        )
-    )
-
-    private fun getMockReviewsForAttraction(attractionId: String): List<Review> {
-        return mockReviewsTemplate.mapIndexed { index, review ->
-            review.copy(
-                id = "r${attractionId}_$index",
-                attractionId = attractionId
-            )
-        }
-    }
-
     fun getReviewsForAttraction(
         attractionId: String,
         sortBy: ReviewSortOption = ReviewSortOption.DEFAULT
@@ -103,64 +60,98 @@ class ReviewRepository @Inject constructor(
             sortReviews(reviews, sortBy)
         }
     }
-
+    
     /**
-     * Refresh approved reviews from Supabase into local in-memory cache.
-     * Keeps UI reactive via the Flow from getReviewsForAttraction().
-     * @param excludeUserId - ID пользователя, чьи отзывы нужно исключить из списка (чтобы избежать дублирования)
+     * Get reviews from local cache INSTANTLY (no network wait).
+     * This is the primary method for displaying reviews when opening a card.
+     * Reviews are pre-synced during main attractions sync.
      */
-    suspend fun refreshApprovedReviews(attractionId: String, excludeUserId: String? = null) {
-        when (val result = reviewsRemoteDataSource.getApprovedReviews(attractionId)) {
-            is NetworkResult.Success -> {
-                val currentUserId = getCurrentUserId()
-                val base = result.data
-                    // КРИТИЧНО: исключаем отзывы текущего пользователя из публичного списка
-                    .filter { dto -> excludeUserId == null || dto.userId != excludeUserId }
-                    .map { dto ->
-                    Review(
-                        id = dto.id,
-                        attractionId = dto.attractionId,
-                        authorId = dto.userId ?: "",
-                        authorName = dto.profile?.displayName ?: "Пользователь",
-                        authorAvatar = dto.profile?.avatarUrl,
-                        authorBadge = null,
-                        rating = dto.rating,
-                        text = listOfNotNull(dto.title, dto.body)
-                            .joinToString("\n")
-                            .ifBlank { null },
-                        createdAt = parseInstant(dto.createdAt) ?: Instant.now(),
-                        updatedAt = parseInstant(dto.updatedAt),
-                        likesCount = dto.likesCount ?: 0,
-                        dislikesCount = dto.dislikesCount ?: 0,
-                        isOwn = dto.userId == currentUserId,
-                        userReaction = ReviewReaction.NONE
-                    )
-                }
-
-                // If authenticated: enrich reviews with current user's reactions (LIKE/DISLIKE)
-                val mapped = enrichWithUserReactions(base)
-
-                _reviews.value = _reviews.value.toMutableMap().apply {
-                    put(attractionId, mapped)
-                }
+    suspend fun getReviewsOfflineFirst(attractionId: String): List<Review> {
+        // Load from Room cache immediately
+        val cached = reviewDao.getApprovedReviews(attractionId)
+        if (cached.isNotEmpty()) {
+            Timber.d("📦 INSTANT: Loaded ${cached.size} reviews from cache for $attractionId")
+            val currentUserId = getCurrentUserId()
+            val reviews = cached.map { it.toDomain() }
+            
+            // Enrich with user reactions if authenticated
+            val enrichedReviews = enrichWithCachedReactions(reviews)
+            
+            _reviews.value = _reviews.value.toMutableMap().apply {
+                put(attractionId, enrichedReviews)
             }
-
-            is NetworkResult.Error -> {
-                Timber.w(
-                    "⚠️ Reviews fetch failed, fallback to mock (if empty). ${result.code}: ${result.message}"
-                )
-                if ((_reviews.value[attractionId] ?: emptyList()).isEmpty()) {
-                    _reviews.value = _reviews.value.toMutableMap().apply {
-                        put(attractionId, getMockReviewsForAttraction(attractionId))
-                    }
+            return enrichedReviews
+        }
+        
+        Timber.d("📦 No cached reviews for $attractionId")
+        return emptyList()
+    }
+    
+    /**
+     * Background delta sync for an attraction.
+     * Called after showing cached data to check for updates.
+     * Does NOT block UI - reviews are already displayed from cache.
+     */
+    suspend fun backgroundSyncReviews(attractionId: String, excludeUserId: String? = null) {
+        // Delta sync in background (returns quickly if cache is fresh)
+        val didSync = reviewSyncService.syncReviewsForAttraction(attractionId)
+        
+        if (didSync) {
+            // Reload from cache after sync
+            val updated = reviewDao.getApprovedReviews(attractionId)
+            if (updated.isNotEmpty()) {
+                val currentUserId = getCurrentUserId()
+                val reviews = updated
+                    .filter { excludeUserId == null || it.userId != excludeUserId }
+                    .map { it.toDomain() }
+                
+                // Enrich with user reactions
+                val enrichedReviews = enrichWithUserReactions(reviews)
+                
+                _reviews.value = _reviews.value.toMutableMap().apply {
+                    put(attractionId, enrichedReviews)
                 }
+                Timber.d("✅ Updated ${enrichedReviews.size} reviews after background sync")
             }
         }
     }
 
+    /**
+     * Refresh approved reviews from Supabase and cache to Room.
+     * Offline-first: shows cached data immediately, then updates from network.
+     * @param excludeUserId - ID пользователя, чьи отзывы нужно исключить из списка (чтобы избежать дублирования)
+     */
+    suspend fun refreshApprovedReviews(attractionId: String, excludeUserId: String? = null) {
+        // First, load from cache for immediate display
+        val cached = reviewDao.getApprovedReviews(attractionId)
+        if (cached.isNotEmpty() && (_reviews.value[attractionId]?.isEmpty() != false)) {
+            val cachedReviews = cached.map { it.toDomain() }
+            _reviews.value = _reviews.value.toMutableMap().apply {
+                put(attractionId, cachedReviews)
+            }
+            Timber.d("📦 Showing ${cached.size} cached reviews")
+        }
+        
+        // Background delta sync
+        backgroundSyncReviews(attractionId, excludeUserId)
+    }
+    
+    /**
+     * Enrich reviews with cached user reactions (from Room).
+     * Fast - no network call.
+     */
+    private fun enrichWithCachedReactions(reviews: List<Review>): List<Review> {
+        // User reactions are stored in ReviewEntity.userReaction
+        // They're already loaded from cache, so just pass through
+        return reviews
+    }
+
     suspend fun fetchReviews(attractionId: String): Result<List<Review>> {
         return try {
-            refreshApprovedReviews(attractionId)
+            // First show cached data instantly
+            getReviewsOfflineFirst(attractionId)
+            // Then sync in background
+            backgroundSyncReviews(attractionId)
             Result.success(_reviews.value[attractionId] ?: emptyList())
         } catch (e: Exception) {
             Result.failure(e)
@@ -173,18 +164,22 @@ class ReviewRepository @Inject constructor(
     suspend fun hasUserReviewed(attractionId: String): Boolean {
         val authState = authRepository.authState.value
         if (authState !is AuthState.Authenticated) return false
-        
+
+        // Fast-path: if we already have an own-review cached locally, trust it.
+        if (reviewDao.hasUserReviewed(attractionId, authState.user.id)) return true
+
         return try {
             val response = supabaseApi.checkUserReviewExists(
                 authorization = "Bearer ${authState.accessToken}",
                 attractionId = "eq.$attractionId",
                 userId = "eq.${authState.user.id}"
             )
-            
+
             response.isSuccessful && (response.body()?.isNotEmpty() == true)
         } catch (e: Exception) {
             Timber.w(e, "Error checking if user reviewed attraction")
-            false
+            // If network fails, fall back to what we know locally.
+            reviewDao.hasUserReviewed(attractionId, authState.user.id)
         }
     }
 
@@ -248,6 +243,9 @@ class ReviewRepository @Inject constructor(
                 
                 // Add to user's own reviews cache
                 _userOwnReviews.value = listOf(review) + _userOwnReviews.value
+
+                // Persist to Room for offline access
+                reviewDao.insertReview(review.toEntity())
                 
                 Timber.d("Review submitted successfully: ${review.id}")
                 Result.success(review)
@@ -285,17 +283,23 @@ class ReviewRepository @Inject constructor(
         }
         
         Timber.d("loadUserOwnReviews: userId=${authState.user.id}")
-        
-        return try {
-            val response = supabaseApi.getUserOwnReviews(
+
+        // Show cached own reviews immediately (offline-first)
+        val cached = reviewDao.getAllUserReviews(authState.user.id)
+        if (cached.isNotEmpty()) {
+            _userOwnReviews.value = cached.map { it.toDomain() }
+            Timber.d("📦 Loaded ${cached.size} own reviews from cache")
+        }
+
+        return when (
+            val result = reviewsRemoteDataSource.getUserReviews(
                 authorization = "Bearer ${authState.accessToken}",
-                userId = "eq.${authState.user.id}"
+                userId = authState.user.id,
+                attractionId = null
             )
-            
-            Timber.d("loadUserOwnReviews: response code=${response.code()}, isSuccessful=${response.isSuccessful}")
-            
-            if (response.isSuccessful) {
-                val reviews = response.body()?.map { dto ->
+        ) {
+            is NetworkResult.Success -> {
+                val reviews = result.data.map { dto ->
                     Review(
                         id = dto.id,
                         attractionId = dto.attractionId,
@@ -309,25 +313,25 @@ class ReviewRepository @Inject constructor(
                             .ifBlank { null },
                         createdAt = parseInstant(dto.createdAt) ?: Instant.now(),
                         updatedAt = parseInstant(dto.updatedAt),
-                        likesCount = 0, // User can't see own review reactions
+                        likesCount = 0,
                         dislikesCount = 0,
                         isOwn = true,
                         status = dto.status,
                         rejectionReason = dto.rejectionReason
                     )
-                } ?: emptyList()
-                
-                Timber.d("loadUserOwnReviews: loaded ${reviews.size} reviews")
+                }
+
                 _userOwnReviews.value = reviews
+                reviewDao.replaceAllUserOwnReviews(authState.user.id, reviews.map { it.toEntity() })
                 Result.success(reviews)
-            } else {
-                val errorBody = response.errorBody()?.string()
-                Timber.e("loadUserOwnReviews: API error ${response.code()}: $errorBody")
-                Result.failure(ReviewException("Не удалось загрузить ваши отзывы"))
             }
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to load user's own reviews")
-            Result.failure(ReviewException("Не удалось загрузить ваши отзывы"))
+
+            is NetworkResult.Error -> {
+                Timber.w("⚠️ loadUserOwnReviews failed: ${result.code}: ${result.message}")
+                // If we have cached data, keep it and report success to avoid breaking UI.
+                if (cached.isNotEmpty()) Result.success(_userOwnReviews.value)
+                else Result.failure(ReviewException("Не удалось загрузить ваши отзывы"))
+            }
         }
     }
     
@@ -351,6 +355,7 @@ class ReviewRepository @Inject constructor(
             if (response.isSuccessful) {
                 // Remove from local cache
                 _userOwnReviews.value = _userOwnReviews.value.filter { it.id != reviewId }
+                reviewDao.deleteReview(reviewId)
                 Result.success(Unit)
             } else {
                 Result.failure(ReviewException("Не удалось удалить отзыв"))
@@ -433,18 +438,23 @@ class ReviewRepository @Inject constructor(
         }
         
         Timber.d("refreshUserOwnReviews: attractionId=$attractionId, userId=${authState.user.id}")
-        
-        try {
-            val response = supabaseApi.getUserOwnReviews(
+
+        // Show cached data first if available
+        val cached = reviewDao.getUserReviews(attractionId, authState.user.id)
+        if (cached.isNotEmpty() && _userOwnReviews.value.isEmpty()) {
+            _userOwnReviews.value = cached.map { it.toDomain() }
+            Timber.d("📦 Showing cached own reviews while fetching from network")
+        }
+
+        when (
+            val result = reviewsRemoteDataSource.getUserReviews(
                 authorization = "Bearer ${authState.accessToken}",
-                userId = "eq.${authState.user.id}",
-                attractionId = "eq.$attractionId"
+                userId = authState.user.id,
+                attractionId = attractionId
             )
-            
-            Timber.d("refreshUserOwnReviews: response code=${response.code()}, isSuccessful=${response.isSuccessful}")
-            
-            if (response.isSuccessful) {
-                val reviews = response.body()?.map { dto ->
+        ) {
+            is NetworkResult.Success -> {
+                val reviews = result.data.map { dto ->
                     Review(
                         id = dto.id,
                         attractionId = dto.attractionId,
@@ -464,18 +474,20 @@ class ReviewRepository @Inject constructor(
                         status = dto.status,
                         rejectionReason = dto.rejectionReason
                     )
-                } ?: emptyList()
-                
-                Timber.d("refreshUserOwnReviews: loaded ${reviews.size} reviews, statuses=${reviews.map { it.status }}")
+                }
+
                 _userOwnReviews.value = reviews
-            } else {
-                val errorBody = response.errorBody()?.string()
-                Timber.e("refreshUserOwnReviews: API error ${response.code()}: $errorBody")
-                // НЕ очищаем _userOwnReviews, сохраняем предыдущее состояние
+                reviewDao.replaceUserOwnReviewsForAttraction(
+                    attractionId = attractionId,
+                    userId = authState.user.id,
+                    reviews = reviews.map { it.toEntity() }
+                )
             }
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to refresh user's own reviews for attraction $attractionId")
-            // НЕ очищаем _userOwnReviews при ошибке сети
+
+            is NetworkResult.Error -> {
+                Timber.e("refreshUserOwnReviews: API error ${result.code}: ${result.message}")
+                // keep cached / previous state
+            }
         }
     }
 
@@ -555,6 +567,83 @@ class ReviewRepository @Inject constructor(
                 )
             }
         }
+    }
+    
+    // ========== Mappers ==========
+    
+    private fun ReviewDto.toDomain(currentUserId: String? = null): Review {
+        return Review(
+            id = id,
+            attractionId = attractionId,
+            authorId = userId ?: "",
+            authorName = profile?.displayName ?: "Пользователь",
+            authorAvatar = profile?.avatarUrl,
+            authorBadge = null,
+            rating = rating,
+            text = listOfNotNull(title, body)
+                .joinToString("\n")
+                .ifBlank { null },
+            createdAt = parseInstant(createdAt) ?: Instant.now(),
+            updatedAt = parseInstant(updatedAt),
+            likesCount = likesCount ?: 0,
+            dislikesCount = dislikesCount ?: 0,
+            isOwn = userId == currentUserId,
+            userReaction = ReviewReaction.NONE,
+            status = status
+        )
+    }
+    
+    private fun ReviewEntity.toDomain(): Review {
+        return Review(
+            id = id,
+            attractionId = attractionId,
+            authorId = userId ?: "",
+            authorName = authorName ?: "Пользователь",
+            authorAvatar = authorAvatar,
+            authorBadge = null,
+            rating = rating,
+            text = listOfNotNull(title, body)
+                .joinToString("\n")
+                .ifBlank { null },
+            createdAt = parseInstant(createdAt) ?: Instant.now(),
+            updatedAt = parseInstant(updatedAt),
+            likesCount = likesCount,
+            dislikesCount = dislikesCount,
+            isOwn = isOwnReview,
+            userReaction = when (userReaction) {
+                "like" -> ReviewReaction.LIKE
+                "dislike" -> ReviewReaction.DISLIKE
+                else -> ReviewReaction.NONE
+            },
+            status = status,
+            rejectionReason = rejectionReason
+        )
+    }
+    
+    private fun Review.toEntity(): ReviewEntity {
+        return ReviewEntity(
+            id = id,
+            attractionId = attractionId,
+            userId = authorId.takeIf { it.isNotBlank() },
+            rating = rating,
+            title = null, // We store full text in body
+            body = text,
+            status = status ?: "approved",
+            rejectionReason = rejectionReason,
+            authorName = authorName,
+            authorAvatar = authorAvatar,
+            likesCount = likesCount,
+            dislikesCount = dislikesCount,
+            userReaction = when (userReaction) {
+                ReviewReaction.LIKE -> "like"
+                ReviewReaction.DISLIKE -> "dislike"
+                ReviewReaction.NONE -> null
+            },
+            createdAt = createdAt.toString(),
+            updatedAt = updatedAt?.toString(),
+            isOwnReview = isOwn,
+            lastSyncedAt = System.currentTimeMillis()
+        )
     }
 }
 

@@ -6,21 +6,24 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.adygyes.app.data.local.dao.AttractionDao
+import com.adygyes.app.data.local.dao.ReviewDao
 import com.adygyes.app.data.local.entities.AttractionEntity
 import com.adygyes.app.data.local.entities.Converters
+import com.adygyes.app.data.local.entities.ReviewEntity
 
 /**
  * Main Room database for the Adygyes app
  */
 @Database(
-    entities = [AttractionEntity::class],
-    version = 4,
+    entities = [AttractionEntity::class, ReviewEntity::class],
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AdygyesDatabase : RoomDatabase() {
     
     abstract fun attractionDao(): AttractionDao
+    abstract fun reviewDao(): ReviewDao
     
     companion object {
         const val DATABASE_NAME = "adygyes_database"
@@ -186,13 +189,51 @@ abstract class AdygyesDatabase : RoomDatabase() {
         }
         
         /**
+         * Migration from version 4 to 5
+         * Adds reviews table for local caching
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Create reviews table
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS reviews (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        attractionId TEXT NOT NULL,
+                        userId TEXT,
+                        rating INTEGER NOT NULL,
+                        title TEXT,
+                        body TEXT,
+                        status TEXT DEFAULT 'approved',
+                        rejectionReason TEXT,
+                        authorName TEXT,
+                        authorAvatar TEXT,
+                        likesCount INTEGER NOT NULL DEFAULT 0,
+                        dislikesCount INTEGER NOT NULL DEFAULT 0,
+                        userReaction TEXT,
+                        createdAt TEXT,
+                        updatedAt TEXT,
+                        isOwnReview INTEGER NOT NULL DEFAULT 0,
+                        lastSyncedAt INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(attractionId) REFERENCES attractions(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                
+                // Create indices for fast queries
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_reviews_attractionId ON reviews(attractionId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_reviews_userId ON reviews(userId)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_reviews_attractionId_userId ON reviews(attractionId, userId)")
+            }
+        }
+        
+        /**
          * Get all migrations array
          */
         fun getMigrations(): Array<Migration> {
             return arrayOf(
                 MIGRATION_1_2,
                 MIGRATION_2_3,
-                MIGRATION_3_4
+                MIGRATION_3_4,
+                MIGRATION_4_5
             )
         }
     }

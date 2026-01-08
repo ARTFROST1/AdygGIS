@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Production configuration -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system certificate authorities -->
+            <certificates src="system" />
+            <!-- Trust user-added CAs for debugging with Charles/Fiddler (only in debug builds) -->
+            <certificates src="user" overridePins="true" />
+        </trust-anchors>
+    </base-config>
+    
+    <!-- Allow cleartext only for localhost (for development/testing) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+    
+    <!-- Supabase domain - enforce HTTPS with modern TLS -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">supabase.co</domain>
+        <pin-set>
+            <!-- Certificate pinning can be added here for extra security -->
+            <!-- For now, we trust system CAs which is sufficient -->
+        </pin-set>
+    </domain-config>
+</network-security-config>

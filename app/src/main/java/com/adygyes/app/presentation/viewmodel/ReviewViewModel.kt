@@ -68,12 +68,17 @@ class ReviewViewModel @Inject constructor(
     private var currentAttractionId: String? = null
     
     /**
-     * Load reviews for an attraction
+     * Load reviews for an attraction.
+     * 
+     * Strategy:
+     * 1. INSTANT: Load from Room cache immediately (no loading spinner)
+     * 2. BACKGROUND: Delta sync to check for updates
+     * 3. UPDATE: If new data found, update UI seamlessly
      */
     fun loadReviews(attractionId: String, forceRefresh: Boolean = false) {
-        // Не пропускаем загрузку если это forceRefresh или другая достопримечательность
+        // Skip reload if same attraction and already have data (unless forceRefresh)
         if (!forceRefresh && currentAttractionId == attractionId && _reviews.value.isNotEmpty()) {
-            // Already loaded, но всё равно обновим userOwnReviews на всякий случай
+            // Still refresh user's own reviews in background
             if (isAuthenticated.value) {
                 viewModelScope.launch {
                     reviewRepository.refreshUserOwnReviews(attractionId)
@@ -85,7 +90,6 @@ class ReviewViewModel @Inject constructor(
         }
         
         currentAttractionId = attractionId
-        _loading.value = true
         _error.value = null
         
         viewModelScope.launch {
@@ -108,21 +112,31 @@ class ReviewViewModel @Inject constructor(
                     reviewRepository.getCurrentUserId()
                 } else null
                 
-                // Always refresh from remote (approved public reviews)
-                // Pass userId to filter out user's own approved reviews from public list
-                reviewRepository.refreshApprovedReviews(attractionId, excludeUserId = currentUserId)
+                // INSTANT: Load from cache immediately (no loading indicator)
+                val cachedReviews = reviewRepository.getReviewsOfflineFirst(attractionId)
+                if (cachedReviews.isNotEmpty()) {
+                    val userReviewIds = _userOwnReviews.value.map { it.id }.toSet()
+                    _reviews.value = cachedReviews.filter { it.id !in userReviewIds }
+                    Timber.d("📦 INSTANT: Displayed ${_reviews.value.size} cached reviews")
+                } else {
+                    // No cache - show loading only when fetching fresh data
+                    _loading.value = true
+                }
+                
+                // BACKGROUND: Delta sync to check for updates
+                reviewRepository.backgroundSyncReviews(attractionId, excludeUserId = currentUserId)
+                
+                // Observe updated reviews from repository
                 reviewRepository.getReviewsForAttraction(attractionId, _sortBy.value)
                     .collect { allReviews ->
-                        // Additional safety: filter out user's own reviews to avoid duplicates
                         val userReviewIds = _userOwnReviews.value.map { it.id }.toSet()
                         _reviews.value = allReviews.filter { it.id !in userReviewIds }
                         _loading.value = false
                     }
             } catch (e: kotlinx.coroutines.CancellationException) {
-                // Coroutine cancelled - don't log as error
                 Timber.d("Review loading cancelled for attraction $attractionId")
                 _loading.value = false
-                throw e // Re-throw to propagate cancellation
+                throw e
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load reviews for attraction $attractionId")
                 _error.value = e.message

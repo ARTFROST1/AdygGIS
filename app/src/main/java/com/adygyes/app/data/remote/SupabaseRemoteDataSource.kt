@@ -53,9 +53,17 @@ class SupabaseRemoteDataSource @Inject constructor(
      */
     suspend fun getUpdatedAttractions(since: String): NetworkResult<List<AttractionDto>> {
         return try {
+            // Normalize timestamp: convert +00:00 to Z for better URL compatibility
+            // Some cellular proxies have issues with encoded + (%2B) in URLs
+            val normalizedTimestamp = since
+                .replace("+00:00", "Z")
+                .replace("+0000", "Z")
+            
+            Timber.d("🔄 Delta sync since: $normalizedTimestamp (original: $since)")
+            
             // Supabase PostgREST filter format: gt.timestamp
             val response = apiService.getUpdatedAttractions(
-                updatedAt = "gt.$since"
+                updatedAt = "gt.$normalizedTimestamp"
             )
             
             if (response.isSuccessful) {

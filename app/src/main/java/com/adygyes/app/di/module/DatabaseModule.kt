@@ -7,6 +7,7 @@ import androidx.room.Room
 import com.adygyes.app.data.local.cache.CacheManager
 import com.adygyes.app.data.local.cache.ImageCacheManager
 import com.adygyes.app.data.local.dao.AttractionDao
+import com.adygyes.app.data.local.dao.ReviewDao
 import com.adygyes.app.data.local.database.AdygyesDatabase
 import com.adygyes.app.data.local.JsonFileManager
 import com.adygyes.app.data.local.preferences.PreferencesManager
@@ -45,6 +46,12 @@ object DatabaseModule {
     @Singleton
     fun provideAttractionDao(database: AdygyesDatabase): AttractionDao {
         return database.attractionDao()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideReviewDao(database: AdygyesDatabase): ReviewDao {
+        return database.reviewDao()
     }
     
     @Provides

@@ -27,6 +27,11 @@ import retrofit2.http.Query
  * - gte.value: greater than or equal
  * - lte.value: less than or equal
  * 
+ * Performance optimizations:
+ * - Selective field fetching (only needed fields)
+ * - Gzip compression via Accept-Encoding header
+ * - Pagination support for large datasets
+ * 
  * RLS (Row Level Security) policies on Supabase ensure:
  * - Only is_published=true attractions are returned to anon users
  * - Sync metadata is readable for delta sync operations
@@ -36,23 +41,30 @@ interface SupabaseApiService {
     /**
      * Get all published attractions
      * RLS policy ensures only is_published=true are returned
+     * 
+     * Note: Using selective fields to reduce response size
+     * Fields match actual Supabase schema (verified 2026-01-08)
      */
     @GET("rest/v1/attractions")
     suspend fun getAllAttractions(
-        @Query("select") select: String = "*",
-        @Query("order") order: String = "name.asc"
+        @Query("select") select: String = "id,name,description,category,latitude,longitude,address,directions,images,phone_number,email,website,working_hours,rating,reviews_count,average_rating,created_at,updated_at",
+        @Query("order") order: String = "name.asc",
+        @Query("limit") limit: Int? = null,
+        @Query("offset") offset: Int? = null
     ): Response<List<AttractionDto>>
     
     /**
      * Get attractions updated after specific timestamp (delta sync)
+     * Uses same field selection as full sync for consistency
      * 
      * @param updatedAt PostgREST filter (e.g., "gt.2025-01-01T00:00:00Z")
      */
     @GET("rest/v1/attractions")
     suspend fun getUpdatedAttractions(
-        @Query("select") select: String = "*",
-        @Query("updated_at") updatedAt: String, // e.g., "gt.2025-01-01T00:00:00Z"
-        @Query("order") order: String = "updated_at.asc"
+        @Query("select") select: String = "id,name,description,category,latitude,longitude,address,directions,images,phone_number,email,website,working_hours,rating,reviews_count,average_rating,created_at,updated_at",
+        @Query("updated_at") updatedAt: String,
+        @Query("order") order: String = "updated_at.asc",
+        @Query("limit") limit: Int? = null
     ): Response<List<AttractionDto>>
     
     /**
@@ -99,6 +111,43 @@ interface SupabaseApiService {
         @Query("attraction_id") attractionId: String, // e.g., "eq.uuid"
         @Query("status") status: String = "eq.approved",
         @Query("order") order: String = "created_at.desc"
+    ): Response<List<ReviewDto>>
+    
+    /**
+     * Get ALL approved reviews (bulk sync during main attractions sync).
+     * Used to pre-populate Room cache so card opens are instant.
+     */
+    @GET("rest/v1/reviews")
+    suspend fun getAllApprovedReviews(
+        @Query("select") select: String = "id,attraction_id,user_id,rating,title,body,status,created_at,updated_at,likes_count,dislikes_count,profiles(display_name,avatar_url)",
+        @Query("status") status: String = "eq.approved",
+        @Query("order") order: String = "updated_at.desc",
+        @Query("limit") limit: Int? = null
+    ): Response<List<ReviewDto>>
+    
+    /**
+     * Get reviews updated since a timestamp (delta sync for reviews).
+     * Used to refresh only changed reviews after initial bulk sync.
+     */
+    @GET("rest/v1/reviews")
+    suspend fun getUpdatedReviews(
+        @Query("select") select: String = "id,attraction_id,user_id,rating,title,body,status,created_at,updated_at,likes_count,dislikes_count,profiles(display_name,avatar_url)",
+        @Query("updated_at") updatedAt: String, // e.g., "gt.2025-01-01T00:00:00Z"
+        @Query("status") status: String = "eq.approved",
+        @Query("order") order: String = "updated_at.asc"
+    ): Response<List<ReviewDto>>
+    
+    /**
+     * Get reviews updated since a timestamp for a specific attraction.
+     * Used when reopening a card to check for updates.
+     */
+    @GET("rest/v1/reviews")
+    suspend fun getUpdatedReviewsForAttraction(
+        @Query("select") select: String = "id,attraction_id,user_id,rating,title,body,status,created_at,updated_at,likes_count,dislikes_count,profiles(display_name,avatar_url)",
+        @Query("attraction_id") attractionId: String, // e.g., "eq.uuid"
+        @Query("updated_at") updatedAt: String, // e.g., "gt.2025-01-01T00:00:00Z"
+        @Query("status") status: String = "eq.approved",
+        @Query("order") order: String = "updated_at.asc"
     ): Response<List<ReviewDto>>
     
     // ========== Authenticated Endpoints (require Bearer token) ==========

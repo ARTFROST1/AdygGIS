@@ -2,10 +2,13 @@ package com.adygyes.app.di.module
 
 import android.content.Context
 import com.adygyes.app.data.local.dao.AttractionDao
+import com.adygyes.app.data.local.dao.ReviewDao
 import com.adygyes.app.data.local.preferences.PreferencesManager
+import com.adygyes.app.data.remote.ReviewsRemoteDataSource
 import com.adygyes.app.data.remote.SupabaseRemoteDataSource
 import com.adygyes.app.data.remote.api.SupabaseApiService
 import com.adygyes.app.data.sync.NetworkMonitor
+import com.adygyes.app.data.sync.ReviewSyncService
 import com.adygyes.app.data.sync.SyncManager
 import com.adygyes.app.data.sync.SyncService
 import dagger.Module
@@ -40,12 +43,32 @@ object SyncModule {
     
     @Provides
     @Singleton
+    fun provideReviewsRemoteDataSource(
+        apiService: SupabaseApiService
+    ): ReviewsRemoteDataSource {
+        return ReviewsRemoteDataSource(apiService)
+    }
+    
+    @Provides
+    @Singleton
+    fun provideReviewSyncService(
+        reviewsRemoteDataSource: ReviewsRemoteDataSource,
+        reviewDao: ReviewDao
+    ): ReviewSyncService {
+        return ReviewSyncService(reviewsRemoteDataSource, reviewDao)
+    }
+    
+    @Provides
+    @Singleton
     fun provideSyncService(
+        @ApplicationContext context: Context,
         remoteDataSource: SupabaseRemoteDataSource,
         attractionDao: AttractionDao,
-        preferencesManager: PreferencesManager
+        preferencesManager: PreferencesManager,
+        networkUseCase: com.adygyes.app.domain.usecase.NetworkUseCase,
+        reviewSyncService: ReviewSyncService
     ): SyncService {
-        return SyncService(remoteDataSource, attractionDao, preferencesManager)
+        return SyncService(context, remoteDataSource, attractionDao, preferencesManager, networkUseCase, reviewSyncService)
     }
     
     @Provides

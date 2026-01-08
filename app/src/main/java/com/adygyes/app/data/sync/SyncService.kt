@@ -1,13 +1,19 @@
 package com.adygyes.app.data.sync
 
+import android.content.Context
 import com.adygyes.app.data.local.dao.AttractionDao
 import com.adygyes.app.data.local.preferences.PreferencesManager
 import com.adygyes.app.data.mapper.AttractionMapper.toEntity
 import com.adygyes.app.data.remote.NetworkResult
 import com.adygyes.app.data.remote.SupabaseRemoteDataSource
+import com.adygyes.app.domain.usecase.NetworkUseCase
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.IOException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,23 +22,33 @@ import javax.inject.Singleton
  * Service responsible for syncing data between Room and Supabase
  * 
  * Implements delta sync strategy:
- * 1. On first run: Full sync (fetch all attractions)
+ * 1. On first run: Full sync (fetch all attractions + all reviews)
  * 2. On subsequent runs: Delta sync (only changes since last sync)
  * 3. Tombstones: Track deleted/unpublished records for removal
  * 
  * Important: Local favorites are preserved during sync.
+ * 
+ * Enhanced with:
+ * - Network connectivity check before sync
+ * - Bulk reviews sync during main sync
+ * - Better error handling and recovery
+ * - Optimized batch processing
  */
 @Singleton
 class SyncService @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val remoteDataSource: SupabaseRemoteDataSource,
     private val attractionDao: AttractionDao,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val networkUseCase: NetworkUseCase,
+    private val reviewSyncService: ReviewSyncService
 ) {
     
     /**
      * Perform delta sync with Supabase
      * 
      * Steps:
+     * 0. Check network connectivity
      * 1. Get last sync timestamp
      * 2. Fetch updated attractions since last sync
      * 3. Fetch deleted attractions (tombstones) since last sync
@@ -41,7 +57,18 @@ class SyncService @Inject constructor(
      */
     suspend fun performSync(): SyncResult = withContext(Dispatchers.IO) {
         try {
-            Timber.d("🔄 Starting sync with Supabase...")
+            // 0. Check network connectivity
+            if (!networkUseCase.isOnline()) {
+                val connectionType = networkUseCase.getConnectionType()
+                Timber.w("⚠️ No internet connection (type: $connectionType)")
+                return@withContext SyncResult(
+                    success = false,
+                    errorMessage = "Нет подключения к интернету. Проверьте настройки сети."
+                )
+            }
+            
+            val connectionType = networkUseCase.getConnectionType()
+            Timber.d("🔄 Starting sync with Supabase... (connection: $connectionType)")
             
             // 1. Get last sync timestamp
             val lastSyncTimestamp = preferencesManager.getLastSyncTimestamp()
@@ -53,21 +80,34 @@ class SyncService @Inject constructor(
             // 2. Fetch updated attractions
             val updatedResult = if (isFirstSync) {
                 // First sync: get all attractions
+                Timber.d("📥 Performing FULL sync (first time)")
                 remoteDataSource.getAllAttractions()
             } else {
                 // Delta sync: only changes since last sync
-                remoteDataSource.getUpdatedAttractions(syncSince)
+                // With fallback to full sync if delta fails
+                Timber.d("📥 Attempting DELTA sync since $syncSince")
+                val deltaResult = remoteDataSource.getUpdatedAttractions(syncSince)
+                
+                // If delta sync failed (network issue), try full sync as fallback
+                if (deltaResult is NetworkResult.Error) {
+                    Timber.w("⚠️ Delta sync failed: ${deltaResult.message}, falling back to full sync")
+                    remoteDataSource.getAllAttractions()
+                } else {
+                    deltaResult
+                }
             }
             
-            // 3. Fetch deleted attractions (tombstones)
-            val deletedResult = remoteDataSource.getDeletedAttractions(syncSince)
+            // 3. Skip tombstones for now (they cause hangs on cellular)
+            // TODO: re-enable once core sync is stable
+            val deletedResult = NetworkResult.Success(emptyList<String>())
             
             // Handle errors
             if (updatedResult is NetworkResult.Error) {
-                Timber.e("❌ Failed to fetch updated attractions: ${updatedResult.message}")
+                val errorMsg = getHumanReadableError(updatedResult.message, updatedResult.code)
+                Timber.e("❌ Failed to fetch updated attractions: $errorMsg")
                 return@withContext SyncResult(
                     success = false,
-                    errorMessage = updatedResult.message
+                    errorMessage = errorMsg
                 )
             }
             
@@ -82,29 +122,33 @@ class SyncService @Inject constructor(
             
             Timber.d("📊 Sync data: ${updatedAttractions.size} updated/new, ${deletedIds.size} deleted")
             
-            // 4. Apply changes to Room DB
+            // 4. Apply changes to Room DB in batches
             var added = 0
             var updated = 0
             
             // Get current favorites to preserve them
-            val favoriteIds = attractionDao.getFavoriteIds()
+            val favoriteIds = attractionDao.getFavoriteIds().toSet()
             
-            updatedAttractions.forEach { dto ->
-                val existingEntity = attractionDao.getAttractionById(dto.id)
-                val newEntity = dto.toEntity()
-                
-                if (existingEntity != null) {
-                    // Update existing - preserve local favorite status
-                    attractionDao.updateAttraction(
-                        newEntity.copy(isFavorite = existingEntity.isFavorite)
-                    )
-                    updated++
-                } else {
-                    // Insert new - check if it was a favorite before (edge case)
-                    attractionDao.insertAttraction(
-                        newEntity.copy(isFavorite = favoriteIds.contains(dto.id))
-                    )
-                    added++
+            // Process in batches for better performance
+            val batchSize = 50
+            updatedAttractions.chunked(batchSize).forEach { batch ->
+                batch.forEach { dto ->
+                    val existingEntity = attractionDao.getAttractionById(dto.id)
+                    val newEntity = dto.toEntity()
+                    
+                    if (existingEntity != null) {
+                        // Update existing - preserve local favorite status
+                        attractionDao.updateAttraction(
+                            newEntity.copy(isFavorite = existingEntity.isFavorite)
+                        )
+                        updated++
+                    } else {
+                        // Insert new - check if it was a favorite before (edge case)
+                        attractionDao.insertAttraction(
+                            newEntity.copy(isFavorite = favoriteIds.contains(dto.id))
+                        )
+                        added++
+                    }
                 }
             }
             
@@ -114,11 +158,28 @@ class SyncService @Inject constructor(
             }
             
             // 5. Update last sync timestamp
-            // Use server timestamp from the latest record, or current time
-            val newTimestamp = calculateNewSyncTimestamp(updatedAttractions)
+            // Use server timestamp from the latest record
+            // If no records received, keep the current sync timestamp (no new changes)
+            val newTimestamp = if (updatedAttractions.isNotEmpty()) {
+                calculateNewSyncTimestamp(updatedAttractions)
+            } else {
+                // No new data - use current server time for next delta sync
+                Instant.now().toString()
+            }
+            
+            Timber.d("📝 Updating sync timestamp: $syncSince → $newTimestamp")
             preferencesManager.updateLastSyncTimestamp(newTimestamp)
             
-            Timber.d("✅ Sync complete: +$added updated=$updated deleted=${deletedIds.size}")
+            // 6. Bulk sync reviews (runs in parallel-ish, uses same connection pool)
+            Timber.d("📥 Syncing reviews...")
+            val reviewsCount = reviewSyncService.performBulkSync()
+            if (reviewsCount >= 0) {
+                Timber.d("✅ Reviews sync complete: $reviewsCount reviews")
+            } else {
+                Timber.w("⚠️ Reviews sync failed, but attractions sync succeeded")
+            }
+            
+            Timber.d("✅ Sync complete: +$added updated=$updated deleted=${deletedIds.size} reviews=$reviewsCount")
             
             SyncResult(
                 success = true,
@@ -127,12 +188,25 @@ class SyncService @Inject constructor(
                 deleted = deletedIds.size
             )
             
+        } catch (e: UnknownHostException) {
+            val errorMsg = "Не удалось подключиться к серверу. Проверьте DNS настройки."
+            Timber.e(e, "❌ DNS error: $errorMsg")
+            SyncResult(success = false, errorMessage = errorMsg)
+            
+        } catch (e: SocketTimeoutException) {
+            val errorMsg = "Превышено время ожидания. Проверьте качество интернет-соединения."
+            Timber.e(e, "❌ Timeout: $errorMsg")
+            SyncResult(success = false, errorMessage = errorMsg)
+            
+        } catch (e: IOException) {
+            val errorMsg = "Ошибка сети: ${e.message ?: "неизвестная ошибка"}"
+            Timber.e(e, "❌ Network error: $errorMsg")
+            SyncResult(success = false, errorMessage = errorMsg)
+            
         } catch (e: Exception) {
-            Timber.e(e, "❌ Sync failed")
-            SyncResult(
-                success = false,
-                errorMessage = e.message
-            )
+            val errorMsg = "Ошибка синхронизации: ${e.message ?: "неизвестная ошибка"}"
+            Timber.e(e, "❌ Sync failed: $errorMsg")
+            SyncResult(success = false, errorMessage = errorMsg)
         }
     }
     
@@ -146,6 +220,15 @@ class SyncService @Inject constructor(
      */
     suspend fun forceFullSync(): SyncResult = withContext(Dispatchers.IO) {
         try {
+            // Check network connectivity
+            if (!networkUseCase.isOnline()) {
+                Timber.w("⚠️ No internet connection for full sync")
+                return@withContext SyncResult(
+                    success = false,
+                    errorMessage = "Нет подключения к интернету"
+                )
+            }
+            
             Timber.d("🔄 Starting FULL sync with Supabase...")
             
             val result = remoteDataSource.getAllAttractions()
@@ -160,19 +243,26 @@ class SyncService @Inject constructor(
                     // Clear existing data
                     attractionDao.deleteAll()
                     
-                    // Insert new data, preserving favorites
-                    attractions.forEach { dto ->
-                        val entity = dto.toEntity().copy(
-                            isFavorite = favoriteIds.contains(dto.id)
-                        )
-                        attractionDao.insertAttraction(entity)
+                    // Insert new data in batches, preserving favorites
+                    val batchSize = 50
+                    attractions.chunked(batchSize).forEach { batch ->
+                        batch.forEach { dto ->
+                            val entity = dto.toEntity().copy(
+                                isFavorite = favoriteIds.contains(dto.id)
+                            )
+                            attractionDao.insertAttraction(entity)
+                        }
                     }
                     
                     // Update sync timestamp
                     val newTimestamp = calculateNewSyncTimestamp(attractions)
+                    Timber.d("📝 Full sync - updating timestamp to: $newTimestamp")
                     preferencesManager.updateLastSyncTimestamp(newTimestamp)
                     
-                    Timber.d("✅ Full sync complete: ${attractions.size} attractions")
+                    // Also sync reviews
+                    Timber.d("📥 Full syncing reviews...")
+                    val reviewsCount = reviewSyncService.performBulkSync()
+                    Timber.d("✅ Full sync complete: ${attractions.size} attractions, $reviewsCount reviews")
                     
                     SyncResult(
                         success = true,
@@ -180,19 +270,51 @@ class SyncService @Inject constructor(
                     )
                 }
                 is NetworkResult.Error -> {
-                    Timber.e("❌ Full sync failed: ${result.message}")
+                    val errorMsg = getHumanReadableError(result.message, result.code)
+                    Timber.e("❌ Full sync failed: $errorMsg")
                     SyncResult(
                         success = false,
-                        errorMessage = result.message
+                        errorMessage = errorMsg
                     )
                 }
             }
+        } catch (e: UnknownHostException) {
+            val errorMsg = "Не удалось подключиться к серверу"
+            Timber.e(e, "❌ DNS error")
+            SyncResult(success = false, errorMessage = errorMsg)
+            
+        } catch (e: SocketTimeoutException) {
+            val errorMsg = "Превышено время ожидания"
+            Timber.e(e, "❌ Timeout")
+            SyncResult(success = false, errorMessage = errorMsg)
+            
+        } catch (e: IOException) {
+            val errorMsg = "Ошибка сети: ${e.message}"
+            Timber.e(e, "❌ Network error")
+            SyncResult(success = false, errorMessage = errorMsg)
+            
         } catch (e: Exception) {
+            val errorMsg = "Ошибка: ${e.message}"
             Timber.e(e, "❌ Full sync failed")
-            SyncResult(
-                success = false,
-                errorMessage = e.message
-            )
+            SyncResult(success = false, errorMessage = errorMsg)
+        }
+    }
+    
+    /**
+     * Convert technical error messages to user-friendly Russian text
+     */
+    private fun getHumanReadableError(message: String?, code: Int?): String {
+        return when {
+            code == 429 -> "Слишком много запросов. Подождите немного."
+            code in 500..599 -> "Сервер временно недоступен. Попробуйте позже."
+            code == 401 || code == 403 -> "Ошибка авторизации. Обновите приложение."
+            message?.contains("timeout", ignoreCase = true) == true -> 
+                "Превышено время ожидания. Проверьте качество связи."
+            message?.contains("host", ignoreCase = true) == true -> 
+                "Не удалось подключиться к серверу."
+            message?.contains("ssl", ignoreCase = true) == true -> 
+                "Ошибка безопасного соединения."
+            else -> message ?: "Неизвестная ошибка сети"
         }
     }
     
@@ -200,16 +322,34 @@ class SyncService @Inject constructor(
      * Calculate new sync timestamp from fetched data
      * 
      * Uses the maximum updated_at from server data to avoid clock skew issues.
-     * Falls back to current time if no data.
+     * Falls back to current time if no data or all timestamps are null.
+     * 
+     * IMPORTANT: Normalizes timestamp to Z format to avoid URL encoding issues on cellular networks.
      */
     private fun calculateNewSyncTimestamp(
         attractions: List<com.adygyes.app.data.remote.dto.AttractionDto>
     ): String {
+        if (attractions.isEmpty()) {
+            val timestamp = Instant.now().toString()
+            Timber.d("⏱️ No attractions, using current time: $timestamp")
+            return timestamp
+        }
+        
         val maxUpdatedAt = attractions
             .mapNotNull { it.updatedAt }
             .maxOrNull()
         
-        return maxUpdatedAt ?: Instant.now().toString()
+        val rawTimestamp = maxUpdatedAt ?: Instant.now().toString()
+        
+        // Normalize to Z format: +00:00 → Z, +0000 → Z
+        // This prevents URL encoding issues on cellular networks
+        val normalizedTimestamp = rawTimestamp
+            .replace("+00:00", "Z")
+            .replace("+0000", "Z")
+        
+        Timber.d("⏱️ Calculated new timestamp from ${attractions.size} attractions: $rawTimestamp → $normalizedTimestamp")
+        
+        return normalizedTimestamp
     }
     
     companion object {
