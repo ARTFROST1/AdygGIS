@@ -124,11 +124,44 @@ class MapPreloadManager @Inject constructor(
                     // ═══════════════════════════════════════════════════════════
                     // NO CACHED DATA: Need to sync from Supabase first
                     // ═══════════════════════════════════════════════════════════
-                    Timber.d("📡 No cached data, syncing from Supabase...")
+                    // CRITICAL: First-launch offline should still show something if assets fallback exists.
+                    Timber.d("📡 No cached data, attempting initial data load + Supabase sync...")
                     _preloadState.value = _preloadState.value.copy(
                         syncInProgress = true,
                         progress = 0.2f
                     )
+
+                    // Try to initialize data (assets fallback when offline / Supabase not configured)
+                    withContext(Dispatchers.IO) {
+                        repository.loadInitialData()
+                    }
+
+                    val afterInitialLoad = withContext(Dispatchers.IO) {
+                        repository.getAllAttractions().first()
+                    }
+
+                    if (afterInitialLoad.isNotEmpty()) {
+                        Timber.d("📦 Loaded ${afterInitialLoad.size} attractions via initial data load")
+                        _attractions.value = afterInitialLoad
+                        _preloadState.value = _preloadState.value.copy(
+                            dataLoaded = true,
+                            syncInProgress = false,
+                            progress = 0.7f
+                        )
+
+                        createMarkersForAttractions(mapView, afterInitialLoad)
+
+                        _preloadState.value = _preloadState.value.copy(
+                            allMarkersReady = true,
+                            isLoading = false,
+                            progress = 1.0f
+                        )
+                        Timber.d("✅ Preload complete after initial data load")
+
+                        // Background sync if possible (non-blocking)
+                        launchBackgroundSync(mapView)
+                        return@launch
+                    }
                     
                     // Perform sync
                     val syncResult = withContext(Dispatchers.IO) {

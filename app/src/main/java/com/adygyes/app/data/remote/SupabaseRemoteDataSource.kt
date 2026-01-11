@@ -115,13 +115,19 @@ class SupabaseRemoteDataSource @Inject constructor(
      */
     suspend fun getDeletedAttractions(since: String): NetworkResult<List<String>> {
         return try {
+            // Normalize timestamp: convert +00:00 to Z for better URL compatibility
+            // Some cellular proxies have issues with encoded + (%2B) in URLs
+            val normalizedTimestamp = since
+                .replace("+00:00", "Z")
+                .replace("+0000", "Z")
+
             val response = apiService.getDeletedAttractions(
-                deletedAt = "gt.$since"
+                deletedAt = "gt.$normalizedTimestamp"
             )
             
             if (response.isSuccessful) {
                 val data = response.body()?.map { it.entityId } ?: emptyList()
-                Timber.d("✅ Fetched ${data.size} deleted attraction IDs since $since")
+                Timber.d("✅ Fetched ${data.size} deleted attraction IDs since $normalizedTimestamp (original: $since)")
                 NetworkResult.Success(data)
             } else {
                 Timber.e("❌ API error: ${response.code()}")
