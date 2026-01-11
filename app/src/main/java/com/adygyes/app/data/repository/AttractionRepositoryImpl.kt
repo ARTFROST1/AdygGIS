@@ -18,6 +18,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.serialization.json.Json
 import timber.log.Timber
 import javax.inject.Inject
@@ -70,16 +72,66 @@ class AttractionRepositoryImpl @Inject constructor(
     }
     
     override suspend fun loadInitialData() {
-        // IMPORTANT:
-        // When Supabase is configured, attractions are synced from Supabase into Room.
-        // Loading from bundled JSON can overwrite server truth and create drift.
-        if (SupabaseConfig.isConfigured()) {
-            Timber.d("ℹ️ Supabase configured: skipping assets JSON initial load")
-            return
-        }
-
         try {
             Timber.d("🔄 Starting loadInitialData() - checking version...")
+            
+            // Check if we already have data in Room
+            val existingCount = attractionDao.getAttractionsCount()
+            val hasData = existingCount > 0
+
+            // If Supabase is configured, Room is the cache for Supabase truth.
+            // Only load assets when we have NO data AND we are offline on first launch.
+            if (SupabaseConfig.isConfigured()) {
+                if (hasData) {
+                    Timber.d("ℹ️ Supabase configured and Room has data ($existingCount) - skipping assets JSON load")
+                    return
+                }
+
+                Timber.d("⚠️ Supabase configured but Room is empty - checking network for first sync...")
+                // Quick network check with timeout
+                val isOnline = try {
+                    withTimeout(2000) {
+                        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                        val network = connectivityManager.activeNetwork
+                        val capabilities = connectivityManager.getNetworkCapabilities(network)
+                        capabilities?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
+                        capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "⚠️ Network check timeout or error")
+                    false
+                }
+                
+                if (!isOnline) {
+                    // OFFLINE on first launch - load from bundled JSON as fallback
+                    Timber.w("⚠️ First launch offline with Supabase configured - loading from bundled JSON as fallback")
+                    loadFromAssetsJson()
+                    return
+                } else {
+                    // Online - let SyncService handle initial sync
+                    Timber.d("ℹ️ First launch online - SyncService will handle initial data load")
+                    return
+                }
+            }
+            
+            // Supabase not configured: assets JSON is the source of truth.
+            // Keep version-based refresh logic inside loadFromAssetsJson().
+            loadFromAssetsJson()
+            
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to load initial data")
+            // Fallback to sample data
+            loadSampleData()
+        }
+    }
+    
+    /**
+     * Load attractions from bundled JSON file in assets.
+     * Used as fallback when offline or Supabase not configured.
+     */
+    private suspend fun loadFromAssetsJson() {
+        try {
+            Timber.d("📦 Loading attractions from bundled JSON...")
             
             // Load from JSON file in assets
             val jsonString = try {
@@ -97,7 +149,7 @@ class AttractionRepositoryImpl @Inject constructor(
             val attractionsResponse = try {
                 json.decodeFromString<AttractionsResponse>(jsonString)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to parse attractions JSON")
+                Timber.e(e, "❌ Failed to parse attractions JSON")
                 // Fallback to sample data if parsing fails
                 loadSampleData()
                 return
@@ -106,18 +158,13 @@ class AttractionRepositoryImpl @Inject constructor(
             // Get current data version from preferences
             val currentVersion = preferencesManager.userPreferencesFlow.first().dataVersion
             val jsonVersion = attractionsResponse.version
-            val hasData = attractionDao.getAttractionsCount() > 0
             
-            Timber.d("📊 Version check: stored='$currentVersion', json='$jsonVersion', hasData=$hasData")
+            Timber.d("📊 Version check: stored='$currentVersion', json='$jsonVersion'")
             
             // Check if we need to update data
             val needsUpdate = when {
-                !hasData -> {
-                    Timber.d("🆕 No data in database, loading initial data")
-                    true
-                }
                 currentVersion == null -> {
-                    Timber.d("🔄 No version stored, updating to version $jsonVersion")
+                    Timber.d("🆕 No version stored, loading initial data")
                     true
                 }
                 currentVersion != jsonVersion -> {
@@ -161,9 +208,8 @@ class AttractionRepositoryImpl @Inject constructor(
             } else {
                 Timber.d("✅ Data is current, no update needed")
             }
-            
         } catch (e: Exception) {
-            Timber.e(e, "Failed to load initial data")
+            Timber.e(e, "❌ Failed to load from assets JSON")
             // Fallback to sample data
             loadSampleData()
         }

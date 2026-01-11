@@ -143,22 +143,61 @@ class MapViewModel @Inject constructor(
         initialValue = emptyList()
     )
     
+    // Track sync state
+    private var isSyncSuccessful = false
+    private var isSyncInProgress = false
+    private var lastSyncFailedDueToNoNetwork = false
+    
     init {
         loadAttractions()
         observeLocationSettings()
         observeDataVersionChanges()
+        observeNetworkChanges()  // Listen for network changes
         performInitialSupabaseSync()
+    }
+    
+    /**
+     * Observe network status changes and retry sync if needed.
+     * CRITICAL FIX: Auto-retry sync when network becomes available after offline start.
+     */
+    private fun observeNetworkChanges() {
+        viewModelScope.launch {
+            networkUseCase.getNetworkStatus().collect { status ->
+                when (status) {
+                    NetworkStatus.Connected -> {
+                        // Retry ONLY if the previous attempt failed due to lack of network.
+                        if (lastSyncFailedDueToNoNetwork && !isSyncInProgress) {
+                            Timber.d("🌐 Network restored, retrying sync...")
+                            performInitialSupabaseSync()
+                        }
+                    }
+                    NetworkStatus.Lost, NetworkStatus.Unavailable -> {
+                        // Network lost - continue working offline
+                        Timber.d("📴 Network lost, working offline")
+                    }
+                    NetworkStatus.Available -> Unit
+                }
+            }
+        }
     }
     
     /**
      * Perform initial sync with Supabase on app startup.
      * Uses delta sync to only fetch changes since last sync.
+     * UPDATED: Tracks sync state for network change handling.
      */
     private fun performInitialSupabaseSync() {
         viewModelScope.launch {
             try {
+                isSyncInProgress = true
                 Timber.d("🔄 Starting initial Supabase sync...")
+                
                 val result = syncService.performSync()
+                
+                isSyncSuccessful = result.success
+                lastSyncFailedDueToNoNetwork = !result.success &&
+                    (result.errorMessage?.contains("Нет подключения", ignoreCase = true) == true)
+                
                 if (result.success) {
                     Timber.d("✅ Supabase sync complete: +${result.added} updated=${result.updated} deleted=${result.deleted}")
                     // Reload attractions if there were any changes
@@ -170,6 +209,10 @@ class MapViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Timber.e(e, "❌ Error during Supabase sync")
+                isSyncSuccessful = false
+                lastSyncFailedDueToNoNetwork = !networkUseCase.isOnline()
+            } finally {
+                isSyncInProgress = false
             }
         }
     }

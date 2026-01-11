@@ -426,8 +426,7 @@ fun AttractionBottomSheet(
             if (attraction.amenities.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 ModernAmenitiesSection(
-                    amenities = attraction.amenities,
-                    modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge)
+                    amenities = attraction.amenities
                 )
             }
             
@@ -435,8 +434,7 @@ fun AttractionBottomSheet(
             if (attraction.tags.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 ModernTagsSection(
-                    tags = attraction.tags,
-                    modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge)
+                    tags = attraction.tags
                 )
             }
             

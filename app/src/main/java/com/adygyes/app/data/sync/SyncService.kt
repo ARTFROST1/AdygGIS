@@ -97,9 +97,7 @@ class SyncService @Inject constructor(
                 }
             }
             
-            // 3. Skip tombstones for now (they cause hangs on cellular)
-            // TODO: re-enable once core sync is stable
-            val deletedResult = NetworkResult.Success(emptyList<String>())
+
             
             // Handle errors
             if (updatedResult is NetworkResult.Error) {
@@ -112,10 +110,22 @@ class SyncService @Inject constructor(
             }
             
             val updatedAttractions = (updatedResult as NetworkResult.Success).data
+            
+            // 3. Fetch deleted attractions (tombstones)
+            // CRITICAL FIX: Re-enabled for full synchronization
+            val deletedResult = if (isFirstSync) {
+                // First sync - no tombstones needed
+                NetworkResult.Success(emptyList<String>())
+            } else {
+                // Delta sync - fetch tombstones
+                Timber.d("📥 Fetching tombstones since $syncSince")
+                remoteDataSource.getDeletedAttractions(syncSince)
+            }
+            
             val deletedIds = when (deletedResult) {
                 is NetworkResult.Success -> deletedResult.data
                 is NetworkResult.Error -> {
-                    Timber.w("⚠️ Could not fetch tombstones: ${deletedResult.message}")
+                    Timber.w("⚠️ Could not fetch tombstones: ${deletedResult.message}, continuing without deletions")
                     emptyList()
                 }
             }

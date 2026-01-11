@@ -31,6 +31,15 @@ class ReviewViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
     
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // IN-MEMORY CACHE (like Zustand in RN) - persists between screen visits
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // This is the KEY difference from before: we keep reviews in memory by attractionId
+    // so when user switches between cards, reviews appear INSTANTLY without any loading
+    private val _reviewsCache = mutableMapOf<String, List<Review>>()
+    private val _userOwnReviewsCache = mutableMapOf<String, List<Review>>()
+    
+    // Current attraction's reviews (for UI consumption)
     private val _reviews = MutableStateFlow<List<Review>>(emptyList())
     val reviews: StateFlow<List<Review>> = _reviews.asStateFlow()
     
@@ -79,14 +88,14 @@ class ReviewViewModel @Inject constructor(
     /**
      * Load reviews for an attraction.
      * 
-     * OFFLINE-FIRST STRATEGY (Best Practices):
-     * 1. INSTANT DISPLAY: Show cached reviews from Room immediately (NO loading spinner)
-     * 2. BACKGROUND SYNC: Fetch updates from server in background (doesn't block UI)
-     * 3. SEAMLESS UPDATE: If new data arrives, update UI smoothly without flickering
-     * 4. GRACEFUL FALLBACK: If network fails, keep showing cached data
+     * OFFLINE-FIRST STRATEGY (like RN Zustand store):
+     * 1. INSTANT FROM MEMORY: If we have in-memory cache, show it IMMEDIATELY (no async, no suspend)
+     * 2. INSTANT FROM ROOM: Otherwise load from Room cache (fast local DB)
+     * 3. BACKGROUND SYNC: Fetch updates from server in background (doesn't block UI)
+     * 4. SEAMLESS UPDATE: If new data arrives, update UI smoothly without flickering
      * 
      * Loading spinner is shown ONLY when:
-     * - Cache is empty AND we're fetching from network for the first time
+     * - NO in-memory cache AND NO Room cache AND we're fetching from network
      */
     fun loadReviews(attractionId: String, forceRefresh: Boolean = false) {
         // Cancel previous sync job if switching attractions
@@ -94,16 +103,24 @@ class ReviewViewModel @Inject constructor(
             syncJob?.cancel()
         }
         
-        // Skip reload if same attraction and already have data (unless forceRefresh)
-        if (!forceRefresh && currentAttractionId == attractionId && _reviews.value.isNotEmpty()) {
-            // Still refresh user's own reviews in background (non-blocking)
-            if (isAuthenticated.value) {
-                viewModelScope.launch {
-                    reviewRepository.refreshUserOwnReviews(attractionId)
-                    _userOwnReviews.value = reviewRepository.userOwnReviews.value
-                    Timber.d("🔄 Background refresh user own reviews, count=${_userOwnReviews.value.size}")
-                }
-            }
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // PHASE 0: INSTANT MEMORY CACHE (like Zustand - no async, no waiting!)
+        // This is what makes RN feel instant - data persists in memory between views
+        // ═══════════════════════════════════════════════════════════════════════════════
+        val memoryReviews = _reviewsCache[attractionId]
+        val memoryOwnReviews = _userOwnReviewsCache[attractionId]
+        
+        if (!forceRefresh && memoryReviews != null) {
+            // INSTANT: Show from memory cache (same as Zustand behavior)
+            _reviews.value = memoryReviews
+            _userOwnReviews.value = memoryOwnReviews ?: emptyList()
+            _loading.value = false
+            _hasUserReviewed.value = memoryOwnReviews?.isNotEmpty() == true
+            currentAttractionId = attractionId
+            Timber.d("⚡ INSTANT MEMORY: ${memoryReviews.size} reviews, ${memoryOwnReviews?.size ?: 0} own")
+            
+            // Still do background sync to catch updates
+            launchBackgroundSync(attractionId, forceRefresh = false)
             return
         }
         
@@ -113,112 +130,125 @@ class ReviewViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // ═══════════════════════════════════════════════════════════
-                // PHASE 1: INSTANT CACHE DISPLAY (no network, no waiting)
+                // PHASE 1: INSTANT ROOM CACHE (no network, no waiting)
                 // ═══════════════════════════════════════════════════════════
                 
                 var userReviewIds: Set<String> = emptySet()
                 var hasAnyCachedContent = false
                 
-                // Load user's own reviews from cache FIRST (before public reviews)
+                // Load user's own reviews from Room cache FIRST
                 if (isAuthenticated.value) {
                     val cachedOwnReviews = reviewRepository.getUserOwnReviewsFromCache(attractionId)
                     if (cachedOwnReviews.isNotEmpty()) {
                         _userOwnReviews.value = cachedOwnReviews
+                        _userOwnReviewsCache[attractionId] = cachedOwnReviews // Save to memory
                         userReviewIds = cachedOwnReviews.map { it.id }.toSet()
                         hasAnyCachedContent = true
-                        Timber.d("📦 INSTANT: ${cachedOwnReviews.size} own reviews from cache")
+                        Timber.d("📦 ROOM CACHE: ${cachedOwnReviews.size} own reviews")
                     }
                 }
                 
-                // Load public reviews from cache INSTANTLY (Room is fast)
+                // Load public reviews from Room cache
                 val cachedReviews = reviewRepository.getReviewsFromCacheOnly(attractionId)
                 val filteredCachedReviews = cachedReviews.filter { it.id !in userReviewIds }
                 
                 if (filteredCachedReviews.isNotEmpty()) {
-                    _reviews.value = sortReviewsLocally(filteredCachedReviews, _sortBy.value)
+                    val sortedReviews = sortReviewsLocally(filteredCachedReviews, _sortBy.value)
+                    _reviews.value = sortedReviews
+                    _reviewsCache[attractionId] = sortedReviews // Save to memory
                     hasAnyCachedContent = true
-                    Timber.d("📦 INSTANT: ${_reviews.value.size} public reviews from cache (no loading spinner)")
+                    Timber.d("📦 ROOM CACHE: ${sortedReviews.size} public reviews")
                 }
 
-                if (hasAnyCachedContent) {
-                    // If we can show something instantly (own reviews and/or public), never block UI.
-                    _loading.value = false
-                } else {
-                    // Only show loading if NOTHING is cached (no own reviews and no public reviews).
-                    _loading.value = true
-                    Timber.d("⏳ No cache content, showing loading spinner")
+                // Set loading state based on cache availability
+                _loading.value = !hasAnyCachedContent
+                if (!hasAnyCachedContent) {
+                    Timber.d("⏳ No cache, showing loading spinner")
                 }
                 
-                // Check hasUserReviewed from cache (fast, no network)
-                checkUserReviewedFromCache(attractionId)
+                // Check hasUserReviewed from cache
+                _hasUserReviewed.value = _userOwnReviews.value.isNotEmpty() || 
+                    reviewRepository.hasUserReviewedFromCache(attractionId)
                 
                 // ═══════════════════════════════════════════════════════════
-                // PHASE 2: BACKGROUND SYNC (non-blocking, updates UI when done)
+                // PHASE 2: BACKGROUND SYNC (non-blocking)
                 // ═══════════════════════════════════════════════════════════
-                
-                syncJob = viewModelScope.launch {
-                    _isSyncing.value = true
-                    
-                    try {
-                        val currentUserId = if (isAuthenticated.value) {
-                            reviewRepository.getCurrentUserId()
-                        } else null
-                        
-                        // Sync user's own reviews in background
-                        if (isAuthenticated.value) {
-                            reviewRepository.refreshUserOwnReviews(attractionId)
-                            val updatedOwnReviews = reviewRepository.userOwnReviews.value
-                            if (updatedOwnReviews != _userOwnReviews.value) {
-                                _userOwnReviews.value = updatedOwnReviews
-                                Timber.d("✅ SYNC: Updated ${updatedOwnReviews.size} own reviews")
-                            }
-                        }
-
-                        // Build current own-review IDs for filtering public reviews.
-                        userReviewIds = _userOwnReviews.value.map { it.id }.toSet()
-                        
-                        // Background delta sync for public reviews
-                        val didSync = reviewRepository.performBackgroundSync(attractionId, excludeUserId = currentUserId)
-                        
-                        if (didSync) {
-                            // Reload from cache after sync
-                            val updatedReviews = reviewRepository.getReviewsFromCacheOnly(attractionId)
-                            val filteredUpdatedReviews = updatedReviews.filter { it.id !in userReviewIds }
-                            
-                            if (filteredUpdatedReviews != _reviews.value) {
-                                _reviews.value = sortReviewsLocally(filteredUpdatedReviews, _sortBy.value)
-                                Timber.d("✅ SYNC: UI updated with ${_reviews.value.size} reviews")
-                            }
-                        }
-                        
-                        // Recheck hasUserReviewed after sync (cache-only; own reviews are already refreshed)
-                        checkUserReviewedFromCache(attractionId)
-                        
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        Timber.d("🚫 Background sync cancelled")
-                        throw e
-                    } catch (e: Exception) {
-                        // Network error during background sync - don't show error if we have cached data
-                        if (_reviews.value.isEmpty()) {
-                            _error.value = "Не удалось загрузить отзывы"
-                        }
-                        Timber.w(e, "⚠️ Background sync failed, keeping cached data")
-                    } finally {
-                        _isSyncing.value = false
-                        _loading.value = false
-                    }
-                }
+                launchBackgroundSync(attractionId, forceRefresh)
                 
             } catch (e: kotlinx.coroutines.CancellationException) {
-                Timber.d("Review loading cancelled for attraction $attractionId")
+                Timber.d("Review loading cancelled for $attractionId")
                 _loading.value = false
                 _isSyncing.value = false
                 throw e
             } catch (e: Exception) {
-                Timber.e(e, "Failed to load reviews for attraction $attractionId")
+                Timber.e(e, "Failed to load reviews for $attractionId")
                 _error.value = e.message
                 _loading.value = false
                 _isSyncing.value = false
+            }
+        }
+    }
+    
+    /**
+     * Launch background sync without blocking UI.
+     * Updates in-memory cache and UI when new data arrives.
+     */
+    private fun launchBackgroundSync(attractionId: String, forceRefresh: Boolean) {
+        syncJob = viewModelScope.launch {
+            _isSyncing.value = true
+            
+            try {
+                val currentUserId = if (isAuthenticated.value) {
+                    reviewRepository.getCurrentUserId()
+                } else null
+                
+                // Sync user's own reviews in background
+                if (isAuthenticated.value) {
+                    reviewRepository.refreshUserOwnReviews(attractionId)
+                    val updatedOwnReviews = reviewRepository.userOwnReviews.value
+                        .filter { it.attractionId == attractionId }
+                    if (updatedOwnReviews != _userOwnReviews.value) {
+                        _userOwnReviews.value = updatedOwnReviews
+                        _userOwnReviewsCache[attractionId] = updatedOwnReviews
+                        Timber.d("✅ SYNC: Updated ${updatedOwnReviews.size} own reviews")
+                    }
+                }
+                
+                // Build current own-review IDs for filtering public reviews
+                val userReviewIds = _userOwnReviews.value.map { it.id }.toSet()
+                
+                // Background delta sync for public reviews
+                val didSync = reviewRepository.performBackgroundSync(attractionId, excludeUserId = currentUserId)
+                
+                if (didSync || forceRefresh) {
+                    // Reload from Room after sync
+                    val updatedReviews = reviewRepository.getReviewsFromCacheOnly(attractionId)
+                    val filteredUpdatedReviews = updatedReviews.filter { it.id !in userReviewIds }
+                    val sortedReviews = sortReviewsLocally(filteredUpdatedReviews, _sortBy.value)
+                    
+                    if (sortedReviews != _reviews.value) {
+                        _reviews.value = sortedReviews
+                        _reviewsCache[attractionId] = sortedReviews
+                        Timber.d("✅ SYNC: UI updated with ${sortedReviews.size} reviews")
+                    }
+                }
+                
+                // Update hasUserReviewed
+                _hasUserReviewed.value = _userOwnReviews.value.isNotEmpty() ||
+                    reviewRepository.hasUserReviewedFromCache(attractionId)
+                
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                Timber.d("🚫 Background sync cancelled")
+                throw e
+            } catch (e: Exception) {
+                // Network error during background sync - don't show error if we have cached data
+                if (_reviews.value.isEmpty() && _reviewsCache[attractionId].isNullOrEmpty()) {
+                    _error.value = "Не удалось загрузить отзывы"
+                }
+                Timber.w(e, "⚠️ Background sync failed, keeping cached data")
+            } finally {
+                _isSyncing.value = false
+                _loading.value = false
             }
         }
     }
@@ -347,7 +377,14 @@ class ReviewViewModel @Inject constructor(
             dislikesCount = newDislikes
         )
         
-        _reviews.value = _reviews.value.map { if (it.id == reviewId) updatedReview else it }.toList()
+        val updatedReviews = _reviews.value.map { if (it.id == reviewId) updatedReview else it }.toList()
+        _reviews.value = updatedReviews
+        
+        // Also update in-memory cache
+        currentAttractionId?.let { attractionId ->
+            _reviewsCache[attractionId] = updatedReviews
+        }
+        
         android.util.Log.d("ReviewViewModel", "⚡ UI UPDATED: $newReaction (likes=$newLikes, dislikes=$newDislikes)")
         
         // Background sync
@@ -391,7 +428,10 @@ class ReviewViewModel @Inject constructor(
                         
                         // КРИТИЧНО: обновить локальный стейт сразу с новым отзывом
                         // Репозиторий уже добавил отзыв в свой кэш, копируем его
-                        _userOwnReviews.value = reviewRepository.userOwnReviews.value
+                        val updatedOwnReviews = reviewRepository.userOwnReviews.value
+                            .filter { it.attractionId == attractionId }
+                        _userOwnReviews.value = updatedOwnReviews
+                        _userOwnReviewsCache[attractionId] = updatedOwnReviews // Update memory cache
                         
                         // Обновить hasUserReviewed флаг
                         _hasUserReviewed.value = true
@@ -432,15 +472,28 @@ class ReviewViewModel @Inject constructor(
     }
     
     /**
-     * Clear reviews (e.g., when navigating away)
+     * Clear current attraction's reviews state.
+     * NOTE: In-memory cache (_reviewsCache) is NOT cleared - this is intentional!
+     * Like RN's Zustand store, we keep reviews in memory by attractionId
+     * so when user returns to a card, reviews appear INSTANTLY.
      */
     fun clearReviews() {
         syncJob?.cancel()
+        // Don't clear _reviewsCache and _userOwnReviewsCache - they persist between screens
         _reviews.value = emptyList()
         _userOwnReviews.value = emptyList()
         _hasUserReviewed.value = false
         _loading.value = false
         _isSyncing.value = false
         currentAttractionId = null
+    }
+    
+    /**
+     * Clear all cached reviews (e.g., on logout or full app reset).
+     */
+    fun clearAllCaches() {
+        clearReviews()
+        _reviewsCache.clear()
+        _userOwnReviewsCache.clear()
     }
 }

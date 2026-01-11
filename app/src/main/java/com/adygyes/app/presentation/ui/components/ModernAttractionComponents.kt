@@ -54,6 +54,17 @@ fun ModernAttractionInfo(
     val primaryColor = MaterialTheme.colorScheme.primary
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
     
+    // DEBUG: Log attraction data
+    android.util.Log.d("ModernAttractionInfo", """
+        📍 Displaying attraction: ${attraction.name}
+        ☀️ Operating Season: ${attraction.operatingSeason ?: "NULL"}
+        💰 Price Info: ${attraction.priceInfo ?: "NULL"}
+        ⏱️ Duration: ${attraction.duration ?: "NULL"}
+        📅 Best Time: ${attraction.bestTimeToVisit ?: "NULL"}
+        🎯 Amenities count: ${attraction.amenities.size}
+        🏷️ Tags count: ${attraction.tags.size}
+    """.trimIndent())
+    
     // Build essential info list
     val essentialInfo = buildList {
         attraction.location.address?.let { address ->
@@ -68,11 +79,27 @@ fun ModernAttractionInfo(
             ))
         }
         
+        attraction.location.directions?.let { directions ->
+            add(InfoCardData(
+                icon = Icons.Outlined.Explore,
+                label = "Как добраться",
+                value = directions
+            ))
+        }
+        
         attraction.workingHours?.let { hours ->
             add(InfoCardData(
                 icon = Icons.Outlined.Schedule,
                 label = "Время работы",
                 value = hours
+            ))
+        }
+        
+        attraction.operatingSeason?.let { season ->
+            add(InfoCardData(
+                icon = Icons.Outlined.WbSunny,
+                label = "Сезон работы",
+                value = season
             ))
         }
         
@@ -111,6 +138,18 @@ fun ModernAttractionInfo(
                 onClick = {
                     val uri = Uri.parse("tel:$phone")
                     context.startActivity(Intent(Intent.ACTION_DIAL, uri))
+                }
+            ))
+        }
+        
+        attraction.contactInfo?.email?.let { email ->
+            add(InfoCardData(
+                icon = Icons.Outlined.Email,
+                label = "Написать",
+                value = email,
+                onClick = {
+                    val uri = Uri.parse("mailto:$email")
+                    context.startActivity(Intent(Intent.ACTION_SENDTO, uri))
                 }
             ))
         }
@@ -348,11 +387,20 @@ fun ModernAmenitiesSection(
     amenities: List<String>,
     modifier: Modifier = Modifier
 ) {
+    android.util.Log.d("ModernAmenitiesSection", "🎯 Amenities received: ${amenities.size} items")
+    amenities.forEachIndexed { index, amenity ->
+        android.util.Log.d("ModernAmenitiesSection", "  $index: $amenity")
+    }
+    
     if (amenities.isEmpty()) return
     
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
         Text(
-            text = "Удобства",
+            text = "УДОБСТВА",
             style = MaterialTheme.typography.labelMedium.copy(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
@@ -362,15 +410,16 @@ fun ModernAmenitiesSection(
             modifier = Modifier.padding(bottom = 12.dp)
         )
         
-        // FlowRow with exact RN spacing
+        // FlowRow with exact RN spacing (8dp gap)
         FlowRow(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             amenities.forEach { amenity ->
                 ModernAmenityCard(
                     amenity = amenity,
-                    modifier = Modifier.weight(1f, fill = false).widthIn(min = 150.dp, max = 200.dp)
+                    modifier = Modifier.fillMaxWidth(0.48f) // 48% width like RN maxWidth: '48%'
                 )
             }
         }
@@ -390,18 +439,14 @@ private fun ModernAmenityCard(
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
     
     Surface(
-        modifier = modifier
-            .shadow(
-                elevation = 1.dp,
-                shape = RoundedCornerShape(12.dp),
-                spotColor = Color.Black.copy(alpha = 0.04f)
-            ),
+        modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             width = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant
-        )
+        ),
+        shadowElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
@@ -449,11 +494,20 @@ fun ModernTagsSection(
     tags: List<String>,
     modifier: Modifier = Modifier
 ) {
+    android.util.Log.d("ModernTagsSection", "🏷️ Tags received: ${tags.size} items")
+    tags.forEachIndexed { index, tag ->
+        android.util.Log.d("ModernTagsSection", "  $index: #$tag")
+    }
+    
     if (tags.isEmpty()) return
     
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
         Text(
-            text = "Метки",
+            text = "МЕТКИ",
             style = MaterialTheme.typography.labelMedium.copy(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
@@ -463,8 +517,9 @@ fun ModernTagsSection(
             modifier = Modifier.padding(bottom = 12.dp)
         )
         
-        // Wrap tags in rows
+        // Wrap tags in rows with exact RN spacing (8dp gap)
         FlowRow(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
