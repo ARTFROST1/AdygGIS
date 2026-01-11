@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material3.*
@@ -30,14 +31,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.adygyes.app.R
 import com.adygyes.app.domain.model.Attraction
 import com.adygyes.app.presentation.theme.Dimensions
+import com.vanniktech.emoji.EmojiTextView
 
 enum class ListViewMode {
     LIST,
@@ -274,6 +278,7 @@ fun AttractionsList(
 
 /**
  * Compact list item for attraction
+ * Horizontal layout: Content left + Square image right (like RN AttractionCard)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -288,21 +293,143 @@ fun AttractionListItem(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .height(260.dp), // Further increased height for horizontal cards
+            .height(120.dp), // Compact height matching RN
         shape = RoundedCornerShape(Dimensions.CornerRadiusMedium),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Column(
+        // Horizontal layout: Content left + Image right
+        Row(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Image section (takes about 50% of card height)
+            // Left side: Content section
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Title
+                Text(
+                    text = attraction.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 20.sp
+                )
+                
+                // Rating and Category badges
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    // Rating badge
+                    attraction.averageRating?.let { rating ->
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = Color(0xFFFFB800) // Yellow star
+                                )
+                                Text(
+                                    text = String.format("%.1f", rating),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Category badge with Apple-style emoji
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            AndroidView(
+                                factory = { context ->
+                                    EmojiTextView(context).apply {
+                                        text = attraction.category.emoji
+                                        textSize = 13f
+                                        includeFontPadding = false
+                                    }
+                                },
+                                modifier = Modifier.wrapContentHeight(Alignment.CenterVertically)
+                            )
+                            Text(
+                                text = attraction.category.displayName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+                
+                // Description
+                Text(
+                    text = attraction.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                
+                // Address
+                attraction.location.address?.let { address ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = address,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+            
+            // Right side: Square image section
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
+                    .width(120.dp)
+                    .fillMaxHeight()
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -311,20 +438,15 @@ fun AttractionListItem(
                         .build(),
                     contentDescription = attraction.name,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(
-                            topStart = Dimensions.CornerRadiusMedium,
-                            topEnd = Dimensions.CornerRadiusMedium
-                        ))
+                    modifier = Modifier.fillMaxSize()
                 )
 
-                // Favorite button positioned on image with animation
+                // Favorite button on image - compact
                 IconButton(
                     onClick = onFavoriteClick,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                        .padding(4.dp)
                         .size(32.dp)
                 ) {
                     AnimatedContent(
@@ -342,16 +464,10 @@ fun AttractionListItem(
                     ) { isFavorite ->
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
-                                .then(
-                                    if (!isFavorite) {
-                                        Modifier.background(
-                                            Color.Black.copy(alpha = 0.3f),
-                                            RoundedCornerShape(50)
-                                        )
-                                    } else {
-                                        Modifier
-                                    }
+                                .size(32.dp)
+                                .background(
+                                    Color.Black.copy(alpha = 0.4f),
+                                    RoundedCornerShape(16.dp)
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
@@ -362,74 +478,14 @@ fun AttractionListItem(
                                 else 
                                     stringResource(R.string.add_to_favorites),
                                 tint = if (isFavorite) 
-                                    Color(0xFF0C5329) // Зеленый цвет
+                                    Color(0xFFE53935) // Red for favorite
                                 else 
-                                    MaterialTheme.colorScheme.onSurface,
+                                    Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
-            }
-
-            // Content section
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f) // Take remaining space after image
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(horizontal = Dimensions.PaddingMedium, vertical = 6.dp)
-            ) {
-                // Category tag and rating on the same level
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CategoryChip(
-                        category = attraction.category,
-                        compact = true
-                    )
-                    
-                    // Rating section - moved to the same level as category
-                    attraction.averageRating?.let { rating ->
-                        if (rating > 0) {
-                            RatingBar(
-                                rating = rating,
-                                size = 12.dp,
-                                showNumericValue = true,
-                                totalReviews = null,
-                                compact = true
-                            )
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(2.dp))
-
-                // Attraction name - увеличенный размер
-                Text(
-                    text = attraction.name,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Short description (first sentence) - увеличенный размер
-                Text(
-                    text = getFirstSentence(attraction.description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
             }
         }
     }

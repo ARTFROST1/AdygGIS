@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.adygyes.app.R
@@ -41,20 +42,22 @@ import com.adygyes.app.presentation.theme.getOverlayIconTint
 import com.adygyes.app.presentation.theme.getContentIconTint
 import com.adygyes.app.presentation.theme.getSecondaryTextColor
 import com.adygyes.app.presentation.theme.getContentTextColor
+import com.vanniktech.emoji.EmojiTextView
 
 /**
  * Reusable attraction card component
- * Unified with RN AttractionCard component
+ * Supports both full card and grid/tile mode
  * 
- * Layout structure (matching RN):
+ * Grid mode (compactForFavorites=true):
+ * - Full-size image with gradient overlay
+ * - White badges on gradient for category and rating
+ * - Compact favorite button
+ * 
+ * Full mode:
  * - Image container with overlay
  *   - Favorite button (top-right)
- *   - Category chip (bottom-left, small, no emoji)
- * - Content section
- *   - Title (2 lines max)
- *   - Meta row: emoji + category name + rating
- *   - Description (2 lines, optional)
- *   - Address row with icon
+ *   - Category chip (bottom-left)
+ * - Content section below
  */
 @Composable
 fun AttractionCard(
@@ -71,22 +74,21 @@ fun AttractionCard(
     val hasImage = attraction.images.isNotEmpty()
     val imageUrl = attraction.images.firstOrNull()
     
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Dimensions.CornerRadiusMedium),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column {
-            // Image Container (like RN imageContainer)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(imageHeight.dp)
-            ) {
+    if (compactForFavorites) {
+        // Grid/Tile mode - matching RN GridAttractionCard
+        Card(
+            onClick = onClick,
+            modifier = modifier
+                .fillMaxWidth()
+                .height(280.dp),
+            shape = RoundedCornerShape(Dimensions.CornerRadiusMedium),
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Full-size image
                 if (hasImage && imageUrl != null) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -97,15 +99,8 @@ fun AttractionCard(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-                    
-                    // Gradient overlay (subtle, like RN)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.1f))
-                    )
                 } else {
-                    // Fallback when no image
+                    // Fallback
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -121,171 +116,380 @@ fun AttractionCard(
                     }
                 }
                 
-                // Favorite button (top-right, like RN)
+                // Enhanced gradient overlay (70% height, three-step gradient)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.7f)
+                        .align(Alignment.BottomCenter)
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.3f),
+                                        Color.Black.copy(alpha = 0.75f)
+                                    ),
+                                    startY = 0f,
+                                    endY = size.height
+                                )
+                            )
+                        }
+                )
+                
+                // Favorite button - compact, top-right
                 IconButton(
                     onClick = onFavoriteClick,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(8.dp)
-                        .size(40.dp)
-                        .background(
-                            color = Color.Black.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(20.dp)
-                        )
+                        .size(32.dp)
                 ) {
-                    AnimatedContent(
-                        targetState = attraction.isFavorite,
-                        transitionSpec = {
-                            scaleIn(
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessLow
-                                )
-                            ) togetherWith scaleOut(animationSpec = tween(150))
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.35f),
+                                RoundedCornerShape(16.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AnimatedContent(
+                            targetState = attraction.isFavorite,
+                            transitionSpec = {
+                                scaleIn(
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow
+                                    )
+                                ) togetherWith scaleOut(animationSpec = tween(150))
+                            }
+                        ) { isFavorite ->
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = if (isFavorite) 
+                                    stringResource(R.string.cd_remove_from_favorites) 
+                                else 
+                                    stringResource(R.string.cd_add_to_favorites),
+                                tint = if (isFavorite) Color(0xFFE53935) else Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
-                    ) { isFavorite ->
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = if (isFavorite) 
-                                stringResource(R.string.cd_remove_from_favorites) 
-                            else 
-                                stringResource(R.string.cd_add_to_favorites),
-                            tint = if (isFavorite) Color(0xFFE53935) else Color.White, // Red for favorite, white for not
-                            modifier = Modifier.size(24.dp)
-                        )
                     }
                 }
                 
-                // Category chip (bottom-left, small, no emoji - like RN categoryOverlay)
-                Box(
+                // Content overlay at bottom
+                Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(8.dp)
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    CategoryChip(
-                        category = attraction.category,
-                        size = ChipSize.SMALL,
-                        showEmoji = false,
-                        showLabel = true
+                    // Title - large and bold
+                    Text(
+                        text = attraction.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        letterSpacing = (-0.3).sp,
+                        modifier = Modifier
+                            .drawWithContent {
+                                drawContent()
+                                // Text shadow for better readability
+                            }
                     )
-                }
-            }
-            
-            // Content section (like RN content)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                // Title
-                Text(
-                    text = attraction.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                // Meta row: emoji + category + rating (like RN metaRow)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Category with emoji
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = attraction.category.emoji,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = attraction.category.displayName,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                     
-                    // Rating (like RN RatingBar)
-                    attraction.averageRating?.let { rating ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    // Bottom row: Category + Rating badges
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Category badge - white background
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color.White.copy(alpha = 0.95f),
+                            shadowElevation = 2.dp
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = Color(0xFFFFB300) // Gold
-                            )
-                            Text(
-                                text = String.format("%.1f", rating),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            // Show review count if available
-                            attraction.reviewsCount?.let { count ->
-                                if (count > 0) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                AndroidView(
+                                    factory = { context ->
+                                        EmojiTextView(context).apply {
+                                            text = attraction.category.emoji
+                                            textSize = 13f
+                                            includeFontPadding = false
+                                        }
+                                    },
+                                    modifier = Modifier.wrapContentHeight(Alignment.CenterVertically)
+                                )
+                                Text(
+                                    text = attraction.category.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        
+                        // Rating badge - white background
+                        attraction.averageRating?.let { rating ->
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color.White.copy(alpha = 0.95f),
+                                shadowElevation = 2.dp
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                        tint = Color(0xFFFFB800) // Yellow star
+                                    )
                                     Text(
-                                        text = "($count)",
+                                        text = String.format("%.1f", rating),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 12.sp
                                     )
                                 }
                             }
                         }
                     }
                 }
-                
-                // Description (like RN description)
-                if (showDescription && !compactForFavorites) {
-                    Text(
-                        text = attraction.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 18.sp
-                    )
-                }
-                
-                // Address row (like RN addressRow)
-                attraction.location.address?.let { address ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        }
+    } else {
+        // Full card mode - original design
+        Card(
+            onClick = onClick,
+            modifier = modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(Dimensions.CornerRadiusMedium),
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column {
+                // Image Container (like RN imageContainer)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(imageHeight.dp)
+                ) {
+                    if (hasImage && imageUrl != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(imageUrl)
+                                .crossfade(200)
+                                .build(),
+                            contentDescription = attraction.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
                         )
-                        Text(
-                            text = if (compactForFavorites) extractSettlement(address) else address,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
+                        
+                        // Gradient overlay (subtle, like RN)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.1f))
+                        )
+                    } else {
+                        // Fallback when no image
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    // Favorite button (top-right, like RN)
+                    IconButton(
+                        onClick = onFavoriteClick,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(40.dp)
+                            .background(
+                                color = Color.Black.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                    ) {
+                        AnimatedContent(
+                            targetState = attraction.isFavorite,
+                            transitionSpec = {
+                                scaleIn(
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow
+                                    )
+                                ) togetherWith scaleOut(animationSpec = tween(150))
+                            }
+                        ) { isFavorite ->
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = if (isFavorite) 
+                                    stringResource(R.string.cd_remove_from_favorites) 
+                                else 
+                                    stringResource(R.string.cd_add_to_favorites),
+                                tint = if (isFavorite) Color(0xFFE53935) else Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    
+                    // Category chip (bottom-left, small, no emoji - like RN categoryOverlay)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(8.dp)
+                    ) {
+                        CategoryChip(
+                            category = attraction.category,
+                            size = ChipSize.SMALL,
+                            showEmoji = true,
+                            showLabel = true
                         )
                     }
                 }
                 
-                // Distance if available
-                if (showDistance && distance != null) {
+                // Content section (like RN content)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Title
                     Text(
-                        text = formatDistanceForCard(distance),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp)
+                        text = attraction.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    
+                    // Meta row: emoji + category + rating (like RN metaRow)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Category with emoji
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = attraction.category.emoji,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = attraction.category.displayName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        // Rating (like RN RatingBar)
+                        attraction.averageRating?.let { rating ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = Color(0xFFFFB800) // Yellow star
+                                )
+                                Text(
+                                    text = String.format("%.1f", rating),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                // Show review count if available
+                                attraction.reviewsCount?.let { count ->
+                                    if (count > 0) {
+                                        Text(
+                                            text = "($count)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Description (like RN description)
+                    if (showDescription) {
+                        Text(
+                            text = attraction.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 18.sp
+                        )
+                    }
+                    
+                    // Address row (like RN addressRow)
+                    attraction.location.address?.let { address ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = address,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                        }
+                    }
+                    
+                    // Distance if available
+                    if (showDistance && distance != null) {
+                        Text(
+                            text = formatDistanceForCard(distance),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
                 }
             }
         }

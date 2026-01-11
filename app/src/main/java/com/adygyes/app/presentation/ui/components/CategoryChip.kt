@@ -14,6 +14,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import android.util.TypedValue
+import com.vanniktech.emoji.EmojiTextView
 import com.adygyes.app.domain.model.AttractionCategory
 
 /**
@@ -52,7 +55,7 @@ fun CategoryChip(
     // Size configuration (unified with RN)
     val effectiveSize = if (compact) ChipSize.SMALL else size
     val (textSize, emojiSize, paddingH, paddingV, cornerRadius) = when (effectiveSize) {
-        ChipSize.SMALL -> SizeConfig(10.sp, 12.sp, 8.dp, 4.dp, 14.dp)
+        ChipSize.SMALL -> SizeConfig(11.sp, 13.sp, 8.dp, 2.dp, 16.dp) // smaller height, rounder corners
         ChipSize.MEDIUM -> SizeConfig(12.sp, 14.sp, 12.dp, 6.dp, 16.dp)
         ChipSize.LARGE -> SizeConfig(14.sp, 16.sp, 16.dp, 8.dp, 20.dp)
     }
@@ -69,9 +72,15 @@ fun CategoryChip(
             horizontalArrangement = Arrangement.Center
         ) {
             if (showEmoji) {
-                Text(
-                    text = category.emoji,
-                    fontSize = emojiSize
+                AndroidView(
+                    factory = { context ->
+                        EmojiTextView(context).apply {
+                            text = category.emoji
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, emojiSize.value)
+                            includeFontPadding = false
+                        }
+                    },
+                    modifier = Modifier.wrapContentHeight(Alignment.CenterVertically)
                 )
                 if (showLabel) {
                     Spacer(modifier = Modifier.width(4.dp))
@@ -82,7 +91,7 @@ fun CategoryChip(
                     text = category.displayName,
                     style = MaterialTheme.typography.labelMedium.copy(fontSize = textSize),
                     color = contentColor,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
