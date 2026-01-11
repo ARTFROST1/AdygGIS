@@ -68,8 +68,10 @@
 > Task :app:kspLiteDebugKotlin
 
 > Task :app:compileFullDebugKotlin FAILED
-.\gradlew.bat : e: file:///C:/Users/moroz/Desktop/AdygGIS/Adyhyes
-KOTLIN/app/src/main/java/com/adygyes/app/data/repository/ReviewRe
+.\gradlew.bat : e: file:///C:/Users/moroz/Desktop/AdygGIS/AdygGIS-KT/app/src/main/java/com/adygyes/app/data/repository/ReviewRe
+pository.kt:390:21 No parameter with name 'body' found.
+At line:1 char:1
+
 pository.kt:390:21 No parameter with name 'body' found.
 At line:1 char:1
 + .\gradlew.bat assembleDebug 2>&1 | Out-File -FilePath .\build_e
@@ -79,15 +81,15 @@ rrors. ...
     'body' found.:String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
  
-e: file:///C:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/m
+e: file:///C:/Users/moroz/Desktop/AdygGIS/AdygGIS-KT/app/src/m
 ain/java/com/adygyes/app/data/repository/ReviewRepository.kt:390:
 21 No value passed for parameter 'request'.
 
 > Task :app:compileLiteDebugKotlin FAILED
-e: file:///C:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/m
+e: file:///C:/Users/moroz/Desktop/AdygGIS/AdygGIS-KT/app/src/m
 ain/java/com/adygyes/app/data/repository/ReviewRepository.kt:390:
 21 No parameter with name 'body' found.
-e: file:///C:/Users/moroz/Desktop/AdygGIS/AdyhyesKOTLIN/app/src/m
+e: file:///C:/Users/moroz/Desktop/AdygGIS/AdygGIS-KT/app/src/m
 ain/java/com/adygyes/app/data/repository/ReviewRepository.kt:390:
 21 No value passed for parameter 'request'.
 

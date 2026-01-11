@@ -84,7 +84,7 @@
 
 #### Шаг 1: Создайте keystore (10 минут)
 ```powershell
-cd c:\Users\moroz\Desktop\AdyhyesKOTLIN
+cd c:\Users\moroz\Desktop\AdygGIS-KT
 mkdir keystore
 
 keytool -genkey -v -keystore keystore/adygyes-release.keystore `

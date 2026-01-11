@@ -5,7 +5,7 @@
 ### 1. Создайте keystore файл
 ```powershell
 # Откройте PowerShell в папке проекта
-cd c:\Users\moroz\Desktop\AdyhyesKOTLIN
+cd c:\Users\moroz\Desktop\AdygGIS-KT
 
 # Создайте папку для keystore
 mkdir keystore
@@ -223,7 +223,7 @@ adb exec-out screencap -p > screenshot1.png
 
 ```powershell
 # Соберите AAB
-cd c:\Users\moroz\Desktop\AdyhyesKOTLIN
+cd c:\Users\moroz\Desktop\AdygGIS-KT
 .\gradlew bundleFullRelease
 
 # AAB будет здесь:

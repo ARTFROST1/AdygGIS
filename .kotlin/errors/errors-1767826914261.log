@@ -1,5 +1,5 @@
 kotlin version: 2.0.21
-error message: java.nio.file.NoSuchFileException: C:\Users\moroz\Desktop\AdygGIS\AdyhyesKOTLIN\app\build\generated\ksp\fullDebug\java\byRounds
+error message: java.nio.file.NoSuchFileException: C:\Users\moroz\Desktop\AdygGIS\AdygGIS-KT\app\build\generated\ksp\fullDebug\java\byRounds
 	at java.base/sun.nio.fs.WindowsException.translateToIOException(Unknown Source)
 	at java.base/sun.nio.fs.WindowsException.rethrowAsIOException(Unknown Source)
 	at java.base/sun.nio.fs.WindowsException.rethrowAsIOException(Unknown Source)

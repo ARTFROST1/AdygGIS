@@ -217,7 +217,7 @@ versionName = "2.0.0"
 ### **3.3 Результат успешной сборки:**
 
 #### **GitHub Release создан:**
-- **URL:** `https://github.com/ВАШ_АККАУНТ/AdyhyesKOTLIN/releases/tag/v1.0.2`
+- **URL:** `https://github.com/ВАШ_АККАУНТ/AdygGIS-KT/releases/tag/v1.0.2`
 - **Название:** `AdygGIS v1.0.2`
 - **Описание:** Автоматически сгенерированное с функциями
 - **Файлы:** APK и AAB прикреплены

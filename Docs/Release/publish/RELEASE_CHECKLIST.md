@@ -19,7 +19,7 @@
 ### 1.1 Проверка сборки
 ```powershell
 # Перейдите в папку проекта
-cd c:\Users\moroz\Desktop\AdyhyesKOTLIN
+cd c:\Users\moroz\Desktop\AdygGIS-KT
 
 # Очистите предыдущие сборки
 .\gradlew clean
@@ -60,11 +60,11 @@ adb install app/build/outputs/apk/full/release/app-full-release.apk
 ```bash
 # Если еще не создан:
 # 1. Откройте github.com
-# 2. Создайте новый репозиторий "AdyhyesKOTLIN"
+# 2. Создайте новый репозиторий "AdygGIS-KT"
 # 3. Сделайте его публичным или приватным
 
 # Добавьте remote (если еще не добавлен):
-git remote add origin https://github.com/ВАШЕ_ИМЯ/AdyhyesKOTLIN.git
+git remote add origin https://github.com/ВАШЕ_ИМЯ/AdygGIS-KT.git
 git branch -M main
 git push -u origin main
 ```
@@ -95,7 +95,7 @@ git push origin gh-pages
 
 # 2. В Settings → Pages выберите gh-pages branch
 # 3. Ваша Privacy Policy будет доступна по адресу:
-# https://ВАШЕ_ИМЯ.github.io/AdyhyesKOTLIN/Docs/Release/publish/privacy-policy.html
+# https://ВАШЕ_ИМЯ.github.io/AdygGIS-KT/Docs/Release/publish/privacy-policy.html
 
 # Опция 2: Используйте любой хостинг (Netlify, Vercel, etc.)
 ```
@@ -142,8 +142,8 @@ App category:
 
 Contact details:
 - Email: [ВАШ_EMAIL]
-- Website: https://github.com/ВАШЕ_ИМЯ/AdyhyesKOTLIN
-- Privacy Policy: https://ВАШЕ_ИМЯ.github.io/AdyhyesKOTLIN/Docs/Release/publish/privacy-policy.html
+- Website: https://github.com/ВАШЕ_ИМЯ/AdygGIS-KT
+- Privacy Policy: https://ВАШЕ_ИМЯ.github.io/AdygGIS-KT/Docs/Release/publish/privacy-policy.html
 ```
 
 ### 3.4 Content rating

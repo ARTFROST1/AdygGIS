@@ -15,8 +15,8 @@
 См. актуальные документы:
 - MasterDocs/technical/AUTH_REVIEWS.md
 - MasterDocs/technical/DATA_SYNC.md
-- AdyhyesKOTLIN/Docs/fixes/REVIEWS_OFFLINE_FIRST_CACHING.md
-- AdyhyesKOTLIN/Docs/fixes/REVIEW_REACTIONS_FIX.md
+- AdygGIS-KT/Docs/fixes/REVIEWS_OFFLINE_FIRST_CACHING.md
+- AdygGIS-KT/Docs/fixes/REVIEW_REACTIONS_FIX.md
 
 ---
 
@@ -989,10 +989,10 @@ Icon(
 ## 🔗 Связанные файлы
 
 ### Backend
-- `StylishMobileLanding/server/routes.ts` - Admin endpoints для approve/reject
+- `Landing-Admin/server/routes.ts` - Admin endpoints для approve/reject
 - `supabase-storage-setup.sql` - Схема БД
 
-### Kotlin (AdyhyesKOTLIN)
+### Kotlin (AdygGIS-KT)
 - `app/data/repository/ReviewRepository.kt`
 - `app/data/remote/api/SupabaseApiService.kt`
 - `app/domain/model/Review.kt`

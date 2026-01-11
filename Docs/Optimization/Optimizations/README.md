@@ -202,7 +202,7 @@ git commit -m "feat: APK optimization complete - 40-50% size reduction"
 ## 📊 СТРУКТУРА ПРОЕКТА
 
 ```
-AdyhyesKOTLIN/
+AdygGIS-KT/
 ├── BUILD_OPTIMIZED_APK.md           ⭐ Главная инструкция по сборке
 ├── cleanup_optimization.bat         Скрипт удаления файлов
 ├── minify_json.bat                  Скрипт минификации JSON

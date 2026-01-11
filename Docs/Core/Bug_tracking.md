@@ -507,7 +507,7 @@ After optimizing the marker binding system for zero-delay positioning, the Camer
 
 **Error Message:**
 ```
-e: file:///C:/Users/moroz/Desktop/AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/presentation/ui/map/markers/MarkerOverlay.kt:64:70 Argument type mismatch: actual type is 'kotlin.Unit', but 'com.yandex.mapkit.map.CameraListener' was expected.
+e: file:///C:/Users/moroz/Desktop/AdygGIS-KT/app/src/main/java/com/adygyes/app/presentation/ui/map/markers/MarkerOverlay.kt:64:70 Argument type mismatch: actual type is 'kotlin.Unit', but 'com.yandex.mapkit.map.CameraListener' was expected.
 ```
 
 **Root Cause:**
@@ -546,7 +546,7 @@ After optimizing the marker binding system for tighter map coordinate synchroniz
 
 **Error Message:**
 ```
-e: file:///C:/Users/moroz/Desktop/AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/presentation/ui/map/markers/MarkerOverlay.kt:135:2 Expecting '}'
+e: file:///C:/Users/moroz/Desktop/AdygGIS-KT/app/src/main/java/com/adygyes/app/presentation/ui/map/markers/MarkerOverlay.kt:135:2 Expecting '}'
 ```
 
 **Root Cause:**
@@ -1333,7 +1333,7 @@ After adding splash screen assets, an `.svg` file was placed directly under `app
 
 **Error Message/Stack Trace:**
 ```
-E:\it\adyghyes_new\AdyhyesKOTLIN\app\src\main\res\drawable\ic_airplane.svg: Error: The file name must end with .xml or .png
+E:\it\adyghyes_new\AdygGIS-KT\app\src\main\res\drawable\ic_airplane.svg: Error: The file name must end with .xml or .png
 ```
 
   **Root Cause:**

@@ -73,7 +73,7 @@ git push origin v1.0.1
 
 #### Проверьте структуру файлов:
 ```
-AdyhyesKOTLIN/
+AdygGIS-KT/
 ├── .github/
 │   └── workflows/
 │       ├── release.yml ✅

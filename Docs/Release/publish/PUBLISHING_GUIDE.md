@@ -38,7 +38,7 @@
 
 ```powershell
 # Откройте PowerShell в папке проекта
-cd c:\Users\moroz\Desktop\AdyhyesKOTLIN
+cd c:\Users\moroz\Desktop\AdygGIS-KT
 
 # Создайте папку для keystore
 mkdir keystore
@@ -100,7 +100,7 @@ storeFile=../keystore/adygyes-release.keystore
 # Build → Generate Signed Bundle / APK → APK
 # Или через командную строку:
 
-cd c:\Users\moroz\Desktop\AdyhyesKOTLIN
+cd c:\Users\moroz\Desktop\AdygGIS-KT
 .\gradlew assembleFullRelease
 
 # APK будет в: app/build/outputs/apk/full/release/app-full-release.apk
@@ -375,7 +375,7 @@ adb exec-out screencap -p > screenshot1.png
 # Build → Generate Signed Bundle / APK → Android App Bundle
 
 # Или через командную строку:
-cd c:\Users\moroz\Desktop\AdyhyesKOTLIN
+cd c:\Users\moroz\Desktop\AdygGIS-KT
 .\gradlew bundleFullRelease
 
 # AAB будет в: app/build/outputs/bundle/fullRelease/app-full-release.aab

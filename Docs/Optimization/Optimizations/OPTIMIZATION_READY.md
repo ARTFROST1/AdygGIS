@@ -114,7 +114,7 @@ ls -lh app\build\outputs\apk\full\release\*.apk
 ## 📂 СТРУКТУРА ФАЙЛОВ
 
 ```
-AdyhyesKOTLIN/
+AdygGIS-KT/
 ├── cleanup_optimization.bat        ⭐ Скрипт удаления
 ├── minify_json.bat                 ⭐ Скрипт минификации
 ├── OPTIMIZATION_READY.md           📄 Этот файл

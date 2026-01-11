@@ -31,7 +31,7 @@
 > Note: The tree below reflects the actual current state of the codebase (as of 2026-01-06).
 
 ```
-AdyhyesKOTLIN/
+AdygGIS-KT/
 ├── app/
 │   ├── src/
 │   │   ├── main/

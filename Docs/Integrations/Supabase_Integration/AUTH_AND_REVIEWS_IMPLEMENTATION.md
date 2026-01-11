@@ -1,4 +1,4 @@
-# Auth & Reviews Implementation — Kotlin (AdyhyesKOTLIN)
+# Auth & Reviews Implementation — Kotlin (AdygGIS-KT)
 
 **Дата:** 8 января 2026  
 **Версия:** 1.3  
@@ -8,7 +8,7 @@
 
 ## 📋 Обзор
 
-Реализация модуля авторизации пользователей и отзывов с модерацией для Android-приложения AdyhyesKOTLIN. Архитектура аналогична React Native версии (AdygGIS-RN), но адаптирована под нативный Android с использованием:
+Реализация модуля авторизации пользователей и отзывов с модерацией для Android-приложения AdygGIS-KT. Архитектура аналогична React Native версии (AdygGIS-RN), но адаптирована под нативный Android с использованием:
 
 - **Retrofit + OkHttp** для REST API вызовов к Supabase GoTrue
 - **EncryptedSharedPreferences (AndroidX Security Crypto)** для безопасного хранения сессии
@@ -41,7 +41,7 @@
                     │ (Retrofit)                    │ (Retrofit)
                     │                               │
 ┌───────────────────┴───────────────────────────────┴─────────────────────────┐
-│                     AdyhyesKOTLIN (Android)                                  │
+│                     AdygGIS-KT (Android)                                  │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │                           Data Layer                                    │ │
 │  │  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────┐ │ │
@@ -282,7 +282,7 @@ Reviews table policies ensure:
 ### Модерация в админке
 
 - Все новые отзывы создаются со статусом `pending`.
-- В Admin Panel (StylishMobileLanding) администратор:
+- В Admin Panel (Landing-Admin) администратор:
    - Approved: выставляет `status = 'approved'`
    - Rejected: выставляет `status = 'rejected'` + `rejection_reason`
 - Клиентское приложение показывает всем пользователям только `approved` отзывы (RLS + явный фильтр `status=eq.approved`).

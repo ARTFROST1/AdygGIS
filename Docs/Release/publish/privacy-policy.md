@@ -120,7 +120,7 @@
 ### Связь с нами:
 
 **📧 Email:** [ВАШ_EMAIL]  
-**🌐 GitHub:** [https://github.com/ВАШЕ_ИМЯ/AdyhyesKOTLIN](https://github.com/ВАШЕ_ИМЯ/AdyhyesKOTLIN)  
+**🌐 GitHub:** [https://github.com/ВАШЕ_ИМЯ/AdygGIS-KT](https://github.com/ВАШЕ_ИМЯ/AdygGIS-KT)  
 **📱 Google Play:** [Ссылка на приложение в Google Play]
 
 ### Вопросы и запросы:

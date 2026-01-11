@@ -10,7 +10,7 @@
 
 ### Основные директории:
 ```
-AdyhyesKOTLIN/
+AdygGIS-KT/
 ├── app/
 │   ├── src/
 │   │   ├── main/

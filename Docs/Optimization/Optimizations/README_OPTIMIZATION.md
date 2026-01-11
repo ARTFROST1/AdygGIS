@@ -269,7 +269,7 @@ ls -lh app/build/outputs/apk/full/release/*.apk
 ## 📚 СТРУКТУРА ДОКУМЕНТАЦИИ
 
 ```
-📁 AdyhyesKOTLIN/
+📁 AdygGIS-KT/
 ├── 📄 README_OPTIMIZATION.md (ТЫ ЗДЕСЬ)
 ├── 📄 OPTIMIZATION_QUICK_START.md (быстрый старт)
 ├── 📄 CRITICAL_FILES_DO_NOT_DELETE.md (важно!)

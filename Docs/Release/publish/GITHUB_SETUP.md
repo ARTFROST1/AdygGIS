@@ -152,9 +152,9 @@ git checkout -b release/v1.1.0
 Добавьте в README.md:
 
 ```markdown
-![Build Status](https://github.com/ВАШЕ_ИМЯ/AdyhyesKOTLIN/workflows/Build%20Check/badge.svg)
-![Release](https://github.com/ВАШЕ_ИМЯ/AdyhyesKOTLIN/workflows/Release%20Build/badge.svg)
-![Version](https://img.shields.io/github/v/release/ВАШЕ_ИМЯ/AdyhyesKOTLIN)
+![Build Status](https://github.com/ВАШЕ_ИМЯ/AdygGIS-KT/workflows/Build%20Check/badge.svg)
+![Release](https://github.com/ВАШЕ_ИМЯ/AdygGIS-KT/workflows/Release%20Build/badge.svg)
+![Version](https://img.shields.io/github/v/release/ВАШЕ_ИМЯ/AdygGIS-KT)
 ```
 
 ## 🎯 Следующие шаги

@@ -57,7 +57,7 @@
 
 ### 1. ReviewRepository.kt
 
-**Файл:** `AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/data/repository/ReviewRepository.kt`
+**Файл:** `AdygGIS-KT/app/src/main/java/com/adygyes/app/data/repository/ReviewRepository.kt`
 
 #### Изменение 1: Добавлен параметр `excludeUserId` в метод `refreshApprovedReviews`
 
@@ -102,7 +102,7 @@ _userOwnReviews.value = listOf(review) + _userOwnReviews.value
 
 ### 2. ReviewViewModel.kt
 
-**Файл:** `AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/presentation/viewmodel/ReviewViewModel.kt`
+**Файл:** `AdygGIS-KT/app/src/main/java/com/adygyes/app/presentation/viewmodel/ReviewViewModel.kt`
 
 #### Изменение 1: Правильный порядок загрузки и фильтрации
 
@@ -199,7 +199,7 @@ if (!forceRefresh && currentAttractionId == attractionId && _reviews.value.isNot
 
 ### 3. ReviewSection.kt
 
-**Файл:** `AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/ReviewSection.kt`
+**Файл:** `AdygGIS-KT/app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/ReviewSection.kt`
 
 #### Изменение 1: Улучшен заголовок секции
 
@@ -365,7 +365,7 @@ Loaded user own reviews, count=1, statuses=[pending]
 
 ### 1. ReviewRepository.kt
 
-**Файл:** `AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/data/repository/ReviewRepository.kt`
+**Файл:** `AdygGIS-KT/app/src/main/java/com/adygyes/app/data/repository/ReviewRepository.kt`
 
 #### Изменение 1: Добавлен параметр `excludeUserId` в метод `refreshApprovedReviews`
 
@@ -401,7 +401,7 @@ fun getCurrentUserId(): String? {
 
 ### 2. ReviewViewModel.kt
 
-**Файл:** `AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/presentation/viewmodel/ReviewViewModel.kt`
+**Файл:** `AdygGIS-KT/app/src/main/java/com/adygyes/app/presentation/viewmodel/ReviewViewModel.kt`
 
 #### Изменение: Правильный порядок загрузки и фильтрации
 
@@ -444,7 +444,7 @@ viewModelScope.launch {
 
 ### 3. ReviewSection.kt
 
-**Файл:** `AdyhyesKOTLIN/app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/ReviewSection.kt`
+**Файл:** `AdygGIS-KT/app/src/main/java/com/adygyes/app/presentation/ui/components/reviews/ReviewSection.kt`
 
 #### Изменение 1: Улучшен заголовок секции
 
