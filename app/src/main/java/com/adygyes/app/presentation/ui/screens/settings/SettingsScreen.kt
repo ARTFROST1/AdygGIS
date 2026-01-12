@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,14 +21,12 @@ import com.adygyes.app.presentation.theme.Dimensions
 import com.adygyes.app.presentation.viewmodel.SettingsViewModel
 import com.adygyes.app.presentation.viewmodel.AuthViewModel
 import com.adygyes.app.presentation.viewmodel.AuthEvent
-import com.adygyes.app.presentation.ui.components.RatingComingSoonDialog
 import com.adygyes.app.presentation.ui.components.auth.AuthModal
 import com.adygyes.app.domain.model.AuthState
 import com.adygyes.app.presentation.viewmodel.PasswordStrength
 import com.adygyes.app.domain.model.currentUser
+import com.adygyes.app.presentation.ui.util.ShareUtils
 import android.widget.Toast
-import android.content.Intent
-import android.net.Uri
 import com.adygyes.app.presentation.ui.util.EasterEggManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -52,7 +52,6 @@ fun SettingsScreen(
     
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
-    var showRatingDialog by remember { mutableStateOf(false) }
     var showAuthModal by remember { mutableStateOf(false) }
     var showSignOutConfirm by remember { mutableStateOf(false) }
     var showClearCacheConfirm by remember { mutableStateOf(false) }
@@ -103,7 +102,8 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        // Edge-to-edge: use system bars insets
+        contentWindowInsets = WindowInsets.systemBars,
         topBar = {
             TopAppBar(
                 title = {
@@ -142,7 +142,7 @@ fun SettingsScreen(
                         enabled = !isNavigating
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.search_back),
                             tint = MaterialTheme.colorScheme.onSurface.copy(
                                 alpha = if (!isNavigating) 1f else 0.5f
@@ -190,7 +190,7 @@ fun SettingsScreen(
                     }
                     else -> {
                         SettingsItem(
-                            icon = Icons.Default.Login,
+                            icon = Icons.AutoMirrored.Filled.Login,
                             title = "Войти",
                             subtitle = "Авторизуйтесь, чтобы оставлять отзывы",
                             onClick = { showAuthModal = true }
@@ -354,9 +354,9 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(Dimensions.SpacingMedium))
             }
             
-            // About Section
+            // Information Section
             item {
-                SettingsSectionHeader(title = stringResource(R.string.settings_about))
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_information))
             }
             
             item {
@@ -372,29 +372,33 @@ fun SettingsScreen(
             }
             
             item {
-                SettingsItem(
-                    icon = Icons.Default.PrivacyTip,
-                    title = stringResource(R.string.settings_privacy),
-                    subtitle = stringResource(R.string.settings_privacy_desc),
-                    onClick = onNavigateToPrivacy
-                )
+                Spacer(modifier = Modifier.height(Dimensions.SpacingMedium))
+            }
+            
+            // Rate & Share Section
+            item {
+                val rateTitle = stringResource(R.string.settings_rate_us)
+                val rateDesc = stringResource(R.string.settings_rate_us_desc)
+                SettingsSectionHeader(title = stringResource(R.string.settings_section_rate_share))
             }
             
             item {
+                val rateTitle = stringResource(R.string.settings_rate_us)
+                val rateDesc = stringResource(R.string.settings_rate_us_desc)
                 SettingsItem(
-                    icon = Icons.Default.Article,
-                    title = stringResource(R.string.settings_terms),
-                    subtitle = stringResource(R.string.settings_terms_desc),
-                    onClick = onNavigateToTerms
-                )
-            }
-            
-            item {
-                SettingsItem(
-                    icon = Icons.Default.RateReview,
-                    title = stringResource(R.string.settings_rate_us),
-                    subtitle = stringResource(R.string.settings_rate_us_desc),
-                    onClick = { showRatingDialog = true }
+                    icon = Icons.Default.Star,
+                    title = rateTitle,
+                    subtitle = rateDesc,
+                    onClick = {
+                        val success = ShareUtils.rateApp(context)
+                        if (!success) {
+                            Toast.makeText(
+                                context,
+                                rateDesc,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
                 )
             }
             
@@ -404,18 +408,7 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_share_app),
                     subtitle = stringResource(R.string.settings_share_app_desc),
                     onClick = {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/MaykopTech"))
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            // Handle error - fallback to sharing text
-                            val shareIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, "Попробуйте AdygGis - приложение для изучения достопримечательностей Адыгеи!")
-                                type = "text/plain"
-                            }
-                            context.startActivity(Intent.createChooser(shareIntent, "Поделиться приложением"))
-                        }
+                        ShareUtils.shareApp(context)
                     }
                 )
             }
@@ -483,12 +476,6 @@ fun SettingsScreen(
             onDismiss = { showThemeDialog = false }
         )
     }
-    
-    // Rating Coming Soon Dialog
-    RatingComingSoonDialog(
-        isVisible = showRatingDialog,
-        onDismiss = { showRatingDialog = false }
-    )
     
     // Auth Modal
     var currentPasswordStrength by remember { mutableStateOf(PasswordStrength.NONE) }

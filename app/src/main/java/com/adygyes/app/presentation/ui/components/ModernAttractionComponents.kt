@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.Accessible
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -370,7 +372,7 @@ private fun ModernContactButton(
             
             // Arrow
             Icon(
-                imageVector = Icons.Filled.ArrowForward,
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.primary
@@ -410,7 +412,7 @@ fun ModernAmenitiesSection(
             modifier = Modifier.padding(bottom = 12.dp)
         )
         
-        // FlowRow with exact RN spacing (8dp gap)
+        // FlowRow with exact RN spacing (8dp gap) and proper sizing
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -419,7 +421,9 @@ fun ModernAmenitiesSection(
             amenities.forEach { amenity ->
                 ModernAmenityCard(
                     amenity = amenity,
-                    modifier = Modifier.fillMaxWidth(0.48f) // 48% width like RN maxWidth: '48%'
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .widthIn(min = 150.dp, max = 200.dp)
                 )
             }
         }
@@ -459,7 +463,7 @@ private fun ModernAmenityCard(
                     .size(32.dp)
                     .background(
                         color = primaryContainer,
-                        shape = CircleShape
+                        shape = RoundedCornerShape(16.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -573,6 +577,7 @@ private fun GradientTag(
 /**
  * Simple FlowRow implementation for tags
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun FlowRow(
     modifier: Modifier = Modifier,
@@ -601,7 +606,7 @@ private fun getAmenityIcon(amenity: String): ImageVector {
         "shop", "магазин", "store" -> Icons.Outlined.ShoppingCart
         "guide", "гид", "экскурсия" -> Icons.Outlined.Person
         "photo", "фото", "photography" -> Icons.Outlined.PhotoCamera
-        "disabled", "инвалиды", "accessibility", "доступность" -> Icons.Outlined.Accessible
+        "disabled", "инвалиды", "accessibility", "доступность" -> Icons.AutoMirrored.Outlined.Accessible
         "atm", "банкомат" -> Icons.Outlined.LocalAtm
         else -> Icons.Outlined.CheckCircle
     }

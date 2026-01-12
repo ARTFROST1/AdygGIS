@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 /**
  * Light color scheme for Adygyes app
@@ -110,18 +109,14 @@ fun AdygyesTheme(
 
     val view = LocalView.current
     if (!view.isInEditMode) {
-        val systemUiController = rememberSystemUiController()
         val useDarkIcons = !darkTheme
         
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = useDarkIcons
-            
-            systemUiController.setSystemBarsColor(
-                color = androidx.compose.ui.graphics.Color.Transparent,
-                darkIcons = useDarkIcons
-            )
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = useDarkIcons
+                isAppearanceLightNavigationBars = useDarkIcons
+            }
         }
     }
 

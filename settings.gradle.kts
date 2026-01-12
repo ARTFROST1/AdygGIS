@@ -23,5 +23,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Adygyes"
+rootProject.name = "AdygGIS"
 include(":app")

@@ -11,6 +11,9 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
@@ -53,7 +56,8 @@ fun FavoritesScreen(
     }
     
     Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        // Edge-to-edge: use system bars insets
+        contentWindowInsets = WindowInsets.systemBars,
         topBar = {
             TopAppBar(
                 title = { 
@@ -66,7 +70,7 @@ fun FavoritesScreen(
                     if (onNavigateBack != null) {
                         IconButton(onClick = onNavigateBack) {
                             Icon(
-                                imageVector = Icons.Default.ArrowBack,
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
@@ -80,7 +84,7 @@ fun FavoritesScreen(
                     ) {
                         Icon(
                             imageVector = if (viewMode == FavoritesViewModel.ViewMode.GRID) {
-                                Icons.Default.ViewList
+                                Icons.AutoMirrored.Filled.ViewList
                             } else {
                                 Icons.Default.GridView
                             },
@@ -96,7 +100,7 @@ fun FavoritesScreen(
                             onClick = { showSortMenu = true }
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Sort,
+                                imageVector = Icons.AutoMirrored.Filled.Sort,
                                 contentDescription = "Sort",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )

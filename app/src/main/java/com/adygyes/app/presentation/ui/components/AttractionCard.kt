@@ -209,10 +209,10 @@ fun AttractionCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Category badge - white background
+                        // Category badge - adaptive theme background
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = Color.White.copy(alpha = 0.95f),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
                             shadowElevation = 2.dp
                         ) {
                             Row(
@@ -240,11 +240,11 @@ fun AttractionCard(
                             }
                         }
                         
-                        // Rating badge - white background
+                        // Rating badge - adaptive theme background
                         attraction.averageRating?.let { rating ->
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = Color.White.copy(alpha = 0.95f),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
                                 shadowElevation = 2.dp
                             ) {
                                 Row(

@@ -155,7 +155,7 @@ fun SplashScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         LinearProgressIndicator(
-                            progress = progress,
+                            progress = { progress },
                             modifier = Modifier
                                 .width(194.dp)
                                 .height(4.dp)

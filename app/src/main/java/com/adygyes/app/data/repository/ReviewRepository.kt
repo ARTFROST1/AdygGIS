@@ -244,9 +244,9 @@ class ReviewRepository @Inject constructor(
     suspend fun fetchReviews(attractionId: String): Result<List<Review>> {
         return try {
             // First show cached data instantly
-            getReviewsOfflineFirst(attractionId)
+            getReviewsFromCacheOnly(attractionId)
             // Then sync in background
-            backgroundSyncReviews(attractionId)
+            performBackgroundSync(attractionId)
             Result.success(_reviews.value[attractionId] ?: emptyList())
         } catch (e: Exception) {
             Result.failure(e)

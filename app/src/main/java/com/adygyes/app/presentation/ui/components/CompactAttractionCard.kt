@@ -65,35 +65,19 @@ fun CompactAttractionCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Circular image with category dot (like RN imageContainer)
-            Box(
-                modifier = Modifier.size(64.dp)
-            ) {
-                AsyncImage(
-                    model = attraction.images.firstOrNull(),
-                    contentDescription = attraction.name,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(
-                            getCategoryColor(attraction.category).copy(alpha = 0.1f),
-                            CircleShape
-                        ),
-                    contentScale = ContentScale.Crop
-                )
-                
-                // Category dot indicator (bottom-right)
-                Box(
-                    modifier = Modifier
-                        .size(16.dp)
-                        .align(Alignment.BottomEnd)
-                        .background(
-                            color = getCategoryColor(attraction.category),
-                            shape = CircleShape
-                        )
-                        .padding(2.dp)
-                )
-            }
+            // Circular image (without category dot)
+            AsyncImage(
+                model = attraction.images.firstOrNull(),
+                contentDescription = attraction.name,
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(
+                        getCategoryColor(attraction.category).copy(alpha = 0.1f),
+                        CircleShape
+                    ),
+                contentScale = ContentScale.Crop
+            )
             
             // Content
             Column(
@@ -137,25 +121,15 @@ fun CompactAttractionCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Rating
+                    // Rating - text only with star emoji (no badge, matching list mode)
                     attraction.averageRating?.let { rating ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = null,
-                                modifier = Modifier.size(12.dp),
-                                tint = Color(0xFFFFB300) // Gold
-                            )
-                            Text(
-                                text = String.format("%.1f", rating),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                        Text(
+                            text = "⭐ ${String.format("%.1f", rating)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 13.sp
+                        )
                     }
                     
                     // Distance

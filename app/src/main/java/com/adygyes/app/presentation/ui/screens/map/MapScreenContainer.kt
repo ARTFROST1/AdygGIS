@@ -94,6 +94,12 @@ fun MapScreenContainer(
                     AboutScreen(
                         onNavigateBack = {
                             screenMode = ScreenMode.SETTINGS // Go back to Settings
+                        },
+                        onNavigateToPrivacy = {
+                            screenMode = ScreenMode.PRIVACY
+                        },
+                        onNavigateToTerms = {
+                            screenMode = ScreenMode.TERMS
                         }
                     )
                 }

@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -125,6 +127,9 @@ fun AuthModal(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.85f)
+                    // Edge-to-edge: add insets padding for keyboard and navigation bar
+                    .navigationBarsPadding()
+                    .imePadding()
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }

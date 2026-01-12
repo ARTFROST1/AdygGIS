@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    
+    <!-- Background circle - green -->
+    <path
+        android:fillColor="#0E4C2F"
+        android:pathData="M256,256m-256,0a256,256 0,1 1,512 0a256,256 0,1 1,-512 0"/>
+    
+    <!-- Outer gold circle -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#CFAA3C"
+        android:strokeWidth="20"
+        android:pathData="M256,256m-220,0a220,220 0,1 1,440 0a220,220 0,1 1,-440 0"/>
+    
+    <!-- Compass star - gold -->
+    <group
+        android:translateX="256"
+        android:translateY="256">
+        
+        <!-- Main star shape (8-pointed) -->
+        <path
+            android:fillColor="#CFAA3C"
+            android:pathData="M0,-140 L15,-40 L50,-50 L20,-15 L40,0 L20,15 L50,50 L15,40 L0,140 L-15,40 L-50,50 L-20,15 L-40,0 L-20,-15 L-50,-50 L-15,-40 Z"/>
+        
+        <!-- Inner circle -->
+        <path
+            android:fillColor="#0E4C2F"
+            android:pathData="M0,0m-35,0a35,35 0,1 1,70 0a35,35 0,1 1,-70 0"/>
+        
+        <!-- Center circle -->
+        <path
+            android:fillColor="#CFAA3C"
+            android:pathData="M0,0m-15,0a15,15 0,1 1,30 0a15,15 0,1 1,-30 0"/>
+    </group>
+    
+    <!-- Four small dots around the circle -->
+    <path
+        android:fillColor="#CFAA3C"
+        android:pathData="M146,256m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0"/>
+    <path
+        android:fillColor="#CFAA3C"
+        android:pathData="M366,256m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0"/>
+    <path
+        android:fillColor="#CFAA3C"
+        android:pathData="M256,146m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0"/>
+    <path
+        android:fillColor="#CFAA3C"
+        android:pathData="M256,366m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0"/>
+</vector>

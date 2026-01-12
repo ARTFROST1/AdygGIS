@@ -26,6 +26,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.adygyes.app"
     compileSdk = 35
+    ndkVersion = "27.2.12479018"
 
     signingConfigs {
         create("release") {
@@ -43,7 +44,7 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = 3
-        versionName = "1.0.2"
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -60,6 +61,13 @@ android {
         // Room schema export
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
+        }
+        
+        // Support for 16 KB page sizes (Android 15+ requirement)
+        // This ensures native libraries are aligned for 16 KB pages
+        ndk {
+            //noinspection ChromeOsAbiSupport
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 
@@ -145,7 +153,8 @@ android {
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
             "-opt-in=kotlinx.coroutines.FlowPreview",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.ui.ExperimentalComposeUiApi"
+            "-opt-in=androidx.compose.ui.ExperimentalComposeUiApi",
+            "-Xjvm-default=all"
         )
     }
     buildFeatures {
@@ -158,6 +167,10 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        // Enable 16 KB page size support for native libraries
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
 }
@@ -181,7 +194,8 @@ dependencies {
     
     // Accompanist
     implementation(libs.accompanist.permissions)
-    implementation(libs.accompanist.systemuicontroller)
+    // accompanist-systemuicontroller REMOVED - deprecated for Android 15
+    // Use enableEdgeToEdge() + WindowCompat.getInsetsController() instead
     
     // Navigation
     implementation(libs.navigation.compose)

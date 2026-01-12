@@ -33,14 +33,23 @@ import android.graphics.Color as AndroidColor
 class MainActivity : ComponentActivity() {
     
     private fun setupEdgeToEdge() {
-        enableEdgeToEdge()
-        // Prevent Android from adding a contrast-enforcing translucent scrim over the navigation bar
+        enableEdgeToEdge(
+            // Configure status bar appearance
+            statusBarStyle = androidx.activity.SystemBarStyle.auto(
+                lightScrim = AndroidColor.TRANSPARENT,
+                darkScrim = AndroidColor.TRANSPARENT
+            ),
+            // Configure navigation bar appearance
+            navigationBarStyle = androidx.activity.SystemBarStyle.auto(
+                lightScrim = AndroidColor.TRANSPARENT,
+                darkScrim = AndroidColor.TRANSPARENT
+            )
+        )
+        
+        // For Android Q+ (API 29+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Prevent Android from adding a contrast-enforcing scrim
             window.isNavigationBarContrastEnforced = false
-        }
-        // Remove navigation bar divider line on Android 9+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            window.navigationBarDividerColor = AndroidColor.TRANSPARENT
         }
     }
     
@@ -111,15 +120,18 @@ class MainActivity : ComponentActivity() {
 fun AdygyesApp() {
     val navController = rememberNavController()
     
+    // Edge-to-edge: Scaffold uses systemBars but we'll handle padding in child composables
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        // Don't consume window insets - let child composables handle them
+        contentWindowInsets = WindowInsets(0.dp)
     ) { innerPadding ->
-        // MapHost now accepts content and provides LocalMapHostController to it
+        // MapHost should draw edge-to-edge
         MapHost(modifier = Modifier.fillMaxSize()) {
             AdygyesNavHost(
                 navController = navController,
-                paddingValues = PaddingValues(0.dp)
+                // Pass scaffold padding (though it's 0 in our case)
+                paddingValues = innerPadding
             )
         }
     }

@@ -92,6 +92,7 @@ class HapticFeedback(private val context: Context) {
                 } else {
                     @Suppress("DEPRECATION")
                     val pattern = longArrayOf(0, 100, 50, 100)
+                    @Suppress("DEPRECATION")
                     vib.vibrate(pattern, -1)
                 }
             }
@@ -113,6 +114,7 @@ class HapticFeedback(private val context: Context) {
                 } else {
                     @Suppress("DEPRECATION")
                     val pattern = longArrayOf(0, 200, 100, 200, 100, 200)
+                    @Suppress("DEPRECATION")
                     vib.vibrate(pattern, -1)
                 }
             }

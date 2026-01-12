@@ -43,11 +43,11 @@ interface SupabaseApiService {
      * RLS policy ensures only is_published=true are returned
      * 
      * Note: Using selective fields to reduce response size
-     * Fields match actual Supabase schema (verified 2026-01-08)
+     * Fields match actual Supabase schema (verified 2026-01-11)
      */
     @GET("rest/v1/attractions")
     suspend fun getAllAttractions(
-        @Query("select") select: String = "id,name,description,category,latitude,longitude,address,directions,images,phone_number,email,website,working_hours,rating,reviews_count,average_rating,created_at,updated_at",
+        @Query("select") select: String = "id,name,description,category,latitude,longitude,address,directions,images,phone_number,email,website,working_hours,rating,reviews_count,average_rating,tags,price_info,amenities,operating_season,duration,best_time_to_visit,is_published,created_at,updated_at",
         @Query("order") order: String = "name.asc",
         @Query("limit") limit: Int? = null,
         @Query("offset") offset: Int? = null
@@ -61,7 +61,7 @@ interface SupabaseApiService {
      */
     @GET("rest/v1/attractions")
     suspend fun getUpdatedAttractions(
-        @Query("select") select: String = "id,name,description,category,latitude,longitude,address,directions,images,phone_number,email,website,working_hours,rating,reviews_count,average_rating,created_at,updated_at",
+        @Query("select") select: String = "id,name,description,category,latitude,longitude,address,directions,images,phone_number,email,website,working_hours,rating,reviews_count,average_rating,tags,price_info,amenities,operating_season,duration,best_time_to_visit,is_published,created_at,updated_at",
         @Query("updated_at") updatedAt: String,
         @Query("order") order: String = "updated_at.asc",
         @Query("limit") limit: Int? = null

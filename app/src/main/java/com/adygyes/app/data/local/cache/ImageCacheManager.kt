@@ -2,6 +2,7 @@ package com.adygyes.app.data.local.cache
 
 import android.content.Context
 import coil.ImageLoader
+import coil.annotation.ExperimentalCoilApi
 import coil.disk.DiskCache as CoilDiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
@@ -19,6 +20,7 @@ import javax.inject.Singleton
  * Manages image caching for the application using Coil
  * Integrates with JSON versioning to clear cache when data updates
  */
+@OptIn(ExperimentalCoilApi::class)
 @Singleton
 class ImageCacheManager @Inject constructor(
     @ApplicationContext private val context: Context

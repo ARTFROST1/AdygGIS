@@ -154,7 +154,7 @@ fun SearchResultsPanel(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(bottom = 100.dp) // Space for keyboard
+                            contentPadding = PaddingValues(bottom = 200.dp) // Extra space for bottom sheet state
                         ) {
                             items(
                                 items = attractions,

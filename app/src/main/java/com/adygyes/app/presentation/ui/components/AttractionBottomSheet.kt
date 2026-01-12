@@ -317,7 +317,13 @@ fun AttractionBottomSheet(
                 // Show on map button (only when opened from list)
                 if (openedFromList) {
                     OutlinedButton(
-                        onClick = onShowOnMap,
+                        onClick = {
+                            // Collapse sheet to half before showing on map
+                            scope.launch {
+                                sheetState.partialExpand()
+                            }
+                            onShowOnMap()
+                        },
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)
                     ) {

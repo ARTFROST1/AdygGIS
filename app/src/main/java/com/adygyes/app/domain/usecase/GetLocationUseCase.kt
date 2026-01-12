@@ -41,16 +41,8 @@ class GetLocationUseCase @Inject constructor(
                 cancellationToken.cancel()
             }
             
-            // Используем более точные настройки для получения текущего местоположения
-            val locationRequest = LocationRequest.create().apply {
-                priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-                interval = 1000L // Быстрое обновление для точности
-                fastestInterval = 500L
-                numUpdates = 1 // Только одно обновление
-            }
-            
             fusedLocationClient.getCurrentLocation(
-                LocationRequest.PRIORITY_HIGH_ACCURACY,
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
                 cancellationToken.token
             ).addOnSuccessListener { location ->
                 if (location != null && location.accuracy <= 50.0f) { // Принимаем только точные координаты (до 50 метров)
@@ -80,12 +72,13 @@ class GetLocationUseCase @Inject constructor(
             return@callbackFlow
         }
         
-        val locationRequest = LocationRequest.create().apply {
-            interval = intervalMillis
-            fastestInterval = intervalMillis / 4 // Более частые обновления для точности
-            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-            smallestDisplacement = 5.0f // Минимальное смещение 5 метров
-        }
+        val locationRequest = LocationRequest.Builder(
+            com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+            intervalMillis
+        ).apply {
+            setMinUpdateIntervalMillis(intervalMillis / 4)
+            setMinUpdateDistanceMeters(5.0f)
+        }.build()
         
         val locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {

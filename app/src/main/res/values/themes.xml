@@ -2,11 +2,11 @@
 <resources>
 
     <style name="Theme.Adygyes" parent="android:Theme.Material.Light.NoActionBar">
-        <!-- Enable edge-to-edge by default -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
-        <item name="android:enforceNavigationBarContrast">false</item>
+        <!-- Edge-to-edge is now handled by enableEdgeToEdge() in MainActivity -->
+        <!-- DO NOT set statusBarColor or navigationBarColor here for Android 15+ -->
+        <!-- These attributes are deprecated and cause warnings in Android 15 -->
+        
+        <!-- Enforce edge-to-edge via Activity.enableEdgeToEdge() instead -->
+        <!-- See MainActivity.setupEdgeToEdge() for implementation -->
     </style>
 </resources>

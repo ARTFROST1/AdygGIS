@@ -6,6 +6,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -17,6 +20,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Accessible
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.*
@@ -176,14 +181,15 @@ fun AttractionDetailScreen(
             val attraction = state.attraction
             
             Scaffold(
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                // Edge-to-edge: use system bars insets
+                contentWindowInsets = WindowInsets.systemBars,
                 topBar = {
                     TopAppBar(
                         title = { },
                         navigationIcon = {
                             IconButton(onClick = onBackClick) {
                                 Icon(
-                                    imageVector = Icons.Default.ArrowBack,
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = stringResource(R.string.cd_back)
                                 )
                             }
@@ -594,7 +600,7 @@ private fun getAmenityIcon(amenity: String): ImageVector {
         "shop", "магазин", "store" -> Icons.Default.ShoppingCart
         "guide", "гид", "экскурсия" -> Icons.Default.Person
         "photo", "фото", "photography" -> Icons.Default.PhotoCamera
-        "disabled", "инвалиды", "accessibility" -> Icons.Default.Accessible
+        "disabled", "инвалиды", "accessibility" -> Icons.AutoMirrored.Filled.Accessible
         else -> Icons.Default.CheckCircle
     }
 }

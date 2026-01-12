@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -263,7 +264,7 @@ private fun extractUsernameFromUrl(url: String): String {
 private fun getSocialMediaInfo(platform: String): Pair<ImageVector, String> {
     return when (platform.lowercase()) {
         "instagram" -> Icons.Default.Camera to "Instagram"
-        "telegram" -> Icons.Default.Send to "Telegram"
+        "telegram" -> Icons.AutoMirrored.Filled.Send to "Telegram"
         "vk", "vkontakte" -> Icons.Default.Group to "VKontakte"
         "facebook" -> Icons.Default.Group to "Facebook"
         "youtube" -> Icons.Default.PlayArrow to "YouTube"

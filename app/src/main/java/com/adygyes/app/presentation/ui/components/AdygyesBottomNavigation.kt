@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -44,7 +45,7 @@ fun AdygyesBottomNavigation(
                 ) { mode ->
                     Icon(
                         imageVector = if (mode == ViewMode.MAP) {
-                            Icons.Filled.List
+                            Icons.AutoMirrored.Filled.List
                         } else {
                             Icons.Filled.Map
                         },

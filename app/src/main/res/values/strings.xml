@@ -152,16 +152,16 @@
     <string name="settings_clear_cache">Очистить кэш</string>
     <string name="settings_clear_cache_desc">Освободить место в хранилище</string>
     <string name="settings_about">О приложении</string>
-    <string name="settings_about_app">О приложении AdygGis</string>
+    <string name="settings_about_app">О приложении AdygGIS</string>
     <string name="settings_version">Версия</string>
     <string name="settings_privacy">Политика конфиденциальности</string>
     <string name="settings_privacy_desc">Узнайте, как мы защищаем ваши данные</string>
     <string name="settings_terms">Условия использования</string>
     <string name="settings_terms_desc">Прочитайте наши условия и положения</string>
-    <string name="settings_rate_us">Оценить нас</string>
-    <string name="settings_rate_us_desc">Поделитесь отзывом в Google Play</string>
+    <string name="settings_rate_us">Оценить приложение</string>
+    <string name="settings_rate_us_desc">Скоро в Google Play</string>
     <string name="settings_share_app">Поделиться приложением</string>
-    <string name="settings_share_app_desc">Рекомендовать AdygGis друзьям</string>
+    <string name="settings_share_app_desc">Порекомендуйте друзьям</string>
     <string name="settings_select_language">Выберите язык</string>
     <string name="settings_select_theme">Выберите тему</string>
     <string name="settings_theme_light_desc">Всегда использовать светлую тему</string>
@@ -169,6 +169,19 @@
     <string name="settings_theme_system_desc">Следовать системным настройкам</string>
     <string name="settings_clear_cache_title">Очистить кэш?</string>
     <string name="settings_clear_cache_message">Это удалит все кэшированные данные, включая автономные карты и изображения. Вам понадобится подключение к интернету для повторной загрузки данных.</string>
+    
+    <!-- Settings Sections -->
+    <string name="settings_section_information">Информация</string>
+    <string name="settings_section_rate_share">Оцените и поделитесь</string>
+    <string name="settings_section_support">Поддержка</string>
+    
+    <!-- Support Section -->
+    <string name="settings_support_telegram">Telegram канал</string>
+    <string name="settings_support_telegram_value">\@MaykopTech</string>
+    <string name="settings_support_email">Email поддержки</string>
+    <string name="settings_support_email_value">frostmoontechsmc\@gmail.com</string>
+    <string name="settings_support_website">Веб-сайт</string>
+    <string name="settings_support_website_value">adyggis.vercel.app</string>
     
     <!-- Common -->
     <string name="common_ok">OK</string>
@@ -184,23 +197,47 @@
     <string name="results_found">найдено</string>
     <string name="clear">Очистить</string>
     
+    <!-- Rating -->
+    <string name="rating_coming_soon_title">Скоро в Google Play!</string>
+    <string name="rating_coming_soon_description">Приложение ещё не доступно для оценки, но совсем скоро мы выпустим его в Google Play. Следите за обновлениями!</string>
+
     <!-- About Screen -->
-    <string name="about_app_slogan">«Открой Адыгею заново»</string>
+    <string name="about_app_slogan">Открой Адыгею заново</string>
     <string name="about_app_description">Удобный путеводитель по самым красивым местам Адыгеи. Прогулки, достопримечательности, маршруты и советы для путешественников.</string>
     <string name="about_version_title">Версия</string>
     <string name="about_version_number">1.0.0</string>
+    <string name="about_version_full">Версия %1$s</string>
+    <string name="about_section_team">Команда разработки</string>
+    <string name="about_section_links">Полезные ссылки</string>
+    <string name="about_section_legal">Правовая информация</string>
     <string name="about_developer_title">Разработка</string>
     <string name="about_developer_info">Разработчик: Sokurov Salim\nРазработчик: Morozov Artem</string>
+    <string name="about_developer_role">Разработчик</string>
+    <string name="about_developer_salim">Sokurov Salim</string>
+    <string name="about_developer_artem">Morozov Artem</string>
     <string name="about_contacts_title">Контакты</string>
     <string name="about_contacts_info">Telegram-канал: @MaykopTech</string>
     <string name="about_privacy_title">Политика конфиденциальности</string>
     <string name="about_privacy_subtitle">Открыть документ</string>
     <string name="about_visit_website">Посетить сайт</string>
-    <string name="about_rate_store">Оценить нас</string>
+    <string name="about_rate_store">Оценить приложение</string>
+
+    <!-- Terms (titles) -->
+    <string name="terms_of_use_title">Условия использования</string>
+    
+    <!-- Contact Links -->
+    <string name="contact_website">Веб-сайт</string>
+    <string name="contact_google_play">Google Play</string>
+    <string name="contact_email">Email</string>
+    <string name="contact_telegram">Telegram</string>
+    <string name="contact_copy_email">Скопировать email</string>
+    <string name="contact_email_copied">Email скопирован в буфер обмена</string>
+    <string name="contact_open_link">Открыть ссылку</string>
 
     <!-- Privacy Policy Screen -->
     <string name="privacy_policy_title">Конфиденциальность</string>
     <string name="privacy_policy_full_title">Политика конфиденциальности</string>
+    <string name="privacy_last_updated">Последнее обновление: %1$s</string>
     <string name="privacy_introduction_title">Введение</string>
     <string name="privacy_introduction_content">Мы ценим вашу конфиденциальность. Ниже описано, как мы собираем, используем и защищаем ваши данные.</string>
     <string name="privacy_data_collection_title">Сбор данных</string>
@@ -210,10 +247,10 @@
     <string name="privacy_data_sharing_title">Обмен данными</string>
     <string name="privacy_data_sharing_content">Мы не передаем ваши данные третьим лицам, кроме случаев, прямо предусмотренных законодательством.</string>
     <string name="privacy_contact_title">Контакты</string>
-    <string name="privacy_contact_content">Вопросы по конфиденциальности: Telegram @MaykopTech</string>
+    <string name="privacy_contact_content">Вопросы по конфиденциальности:\n\nEmail: frostmoontechsmc@gmail.com\nTelegram: @MaykopTech</string>
 
     <!-- Terms of Use Screen -->
-    <string name="terms_of_use_title">Условия пользования</string>
+    <string name="terms_last_updated">Последнее обновление: %1$s</string>
     <string name="terms_introduction_title">Введение</string>
     <string name="terms_introduction_content">Используя приложение, вы соглашаетесь с условиями его работы и соблюдением правил поведения в приложении.</string>
     <string name="terms_content_access_title">Доступ к контенту</string>
@@ -223,11 +260,11 @@
     <string name="terms_community_title">Сообщество</string>
     <string name="terms_community_content">Просим уважать других пользователей и соблюдать правила поведения при использовании функции комментариев и рейтингов.</string>
     <string name="terms_contact_title">Контакты</string>
-    <string name="terms_contact_content">Вопросы по условиям пользования: Telegram @MaykopTech</string>
-
-    <!-- Rating Coming Soon Dialog -->
-    <string name="rating_coming_soon_title">Скоро в Google Play!</string>
-    <string name="rating_coming_soon_description">Приложение ещё не доступно для оценки, но совсем скоро мы выпустим его в Google Play. Следите за обновлениями!</string>
+    <string name="terms_contact_content">Вопросы по условиям пользования:\n\nEmail: frostmoontechsmc@gmail.com\nTelegram: @MaykopTech</string>
+    
+    <!-- Expandable Sections -->
+    <string name="expand_section">Развернуть</string>
+    <string name="collapse_section">Свернуть</string>
 
     <!-- Accessibility -->
     <string name="a11y_back_button">Кнопка назад</string>

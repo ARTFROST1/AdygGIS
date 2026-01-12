@@ -35,7 +35,6 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.request.CachePolicy
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import net.engawapg.lib.zoomable.rememberZoomState
 import net.engawapg.lib.zoomable.zoomable
 
@@ -212,12 +211,11 @@ fun PhotoViewer(
     onDismiss: () -> Unit,
     onShare: ((String) -> Unit)? = null
 ) {
-    val systemUiController = rememberSystemUiController()
+    // Note: System bars hiding is deprecated, using manual window insets instead
+    // Users can swipe to show system bars as needed
     
-    DisposableEffect(systemUiController) {
-        systemUiController.isSystemBarsVisible = false
+    DisposableEffect(Unit) {
         onDispose {
-            systemUiController.isSystemBarsVisible = true
         }
     }
     

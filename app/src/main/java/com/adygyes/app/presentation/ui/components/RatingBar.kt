@@ -3,7 +3,7 @@ package com.adygyes.app.presentation.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarHalf
+import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -51,7 +51,7 @@ fun RatingBar(
         
         if (hasHalfStar) {
             Icon(
-                imageVector = Icons.Filled.StarHalf,
+                imageVector = Icons.AutoMirrored.Filled.StarHalf,
                 contentDescription = "Half star",
                 tint = color,
                 modifier = Modifier.size(size)

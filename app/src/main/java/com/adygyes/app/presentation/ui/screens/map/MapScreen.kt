@@ -18,6 +18,9 @@ import androidx.compose.ui.zIndex
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material3.*
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.runtime.*
@@ -513,7 +516,7 @@ fun MapScreen(
                             ) { mode ->
                                 Icon(
                                     imageVector = when (mode) {
-                                        ViewMode.MAP -> Icons.Default.List
+                                        ViewMode.MAP -> Icons.AutoMirrored.Filled.List
                                         ViewMode.LIST -> Icons.Default.Map
                                     },
                                     contentDescription = when (mode) {
@@ -1143,7 +1146,7 @@ private fun EnhancedSearchTextField(
                             onClick = { showSortMenu = true }
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Sort,
+                                imageVector = Icons.AutoMirrored.Filled.Sort,
                                 contentDescription = stringResource(R.string.sort),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1188,7 +1191,7 @@ private fun EnhancedSearchTextField(
                     ) {
                         Icon(
                             imageVector = if (viewMode == MapViewModel.ListViewMode.GRID) {
-                                Icons.Default.ViewList
+                                Icons.AutoMirrored.Filled.ViewList
                             } else {
                                 Icons.Default.GridView
                             },
