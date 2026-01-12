@@ -271,10 +271,10 @@ implementation(libs.coil.compose)
 
 Не удалять основные документы:
 - ❌ `IMPORTANT_KEYSTORE_BACKUP.md`
-- ❌ `Docs/Core/PRD_adygyes.md`
-- ❌ `Docs/Core/Implementation_Plan.md`
-- ❌ `Docs/Core/AppMap_adygyes.md`
-- ❌ `Docs/Core/project_structure.md`
+- ❌ `Docs/PRD_adygyes.md`
+- ❌ `Docs/Implementation_Plan.md`
+- ❌ `Docs/AppMap_adygyes.md`
+- ❌ `Docs/project_structure.md`
 
 ---
 

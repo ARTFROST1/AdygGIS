@@ -377,36 +377,14 @@ app/
 - [x] Auth System (Supabase GoTrue)
   - [x] AuthRepository (signIn, signUp, signOut, refreshToken)
   - [x] AuthViewModel + AuthModal UI
-    - [x] SecureAuthPreferencesManager (EncryptedSharedPreferences session persistence)
-    - [x] TokenAuthenticator + ProactiveTokenRefreshInterceptor (401 + proactive refresh)
+  - [x] SecureAuthPreferencesManager (EncryptedSharedPreferences session persistence)
+  - [x] TokenAuthenticator + ProactiveTokenRefreshInterceptor (401 + proactive refresh)
   - [x] SupabaseAuthApi (Retrofit interface)
 - [x] Reviews System
   - [x] ReviewRepository (submitReview, refreshReviews, hasUserReviewed)
   - [x] ReviewViewModel + ReviewSection UI
   - [x] ReviewCard, RatingSummaryBlock, WriteReviewModal
   - [x] StatusBadge, InteractiveRating
-- [ ] Theme and design system
-
-### Phase 3: Map Features
-- [ ] Map display with Yandex MapKit
-- [ ] Custom markers and clustering
-- [ ] POI data model
-- [ ] Location services
-- [ ] Offline map support
-
-### Phase 4: Application Features
-- [ ] Search functionality
-- [ ] Favorites management
-- [ ] POI detail cards
-- [ ] Category filtering
-- [ ] Settings screen
-
-### Phase 5: Polish & Optimization
-- [ ] Performance optimization
-- [ ] Memory leak prevention
-- [ ] ProGuard rules
-- [ ] Analytics integration
-- [ ] Crash reporting
 
 ---
 
@@ -567,6 +545,6 @@ android {
 - 2026-01-06: Added Phase 6 (Auth & Reviews) to checklist; updated Future Enhancements to reflect realized features; bumped version to 1.0.1.
 - 2025-09-22: Updated Gradle to 8.13 (wrapper), AGP to 8.7.3; aligned lifecycleRuntimeKtx to 2.9.4; documented centralized repositories in settings.gradle.kts.
 
-*Document Version: 1.1.0*  
-*Last Updated: January 6, 2026*  
+*Document Version: 1.1.1*  
+*Last Updated: January 12, 2026*  
 *Author: CTO - AdygGIS Project*

@@ -1,6 +1,7 @@
 # UI/UX Design Document
 
-**Last Updated:** 2026-01-06  
+**Last Updated:** 2026-01-12  
+**App Version:** 1.0.1 (versionCode: 3)  
 **Status:** Implemented ✅
 
 ## Design System
@@ -124,7 +125,7 @@ Based on Adygea flag colors and Material Design 3:
 - Recommended: 56x56dp for primary actions
 
 #### Navigation
-- **Bottom Navigation:** Hidden on map, visible on other screens
+- **Navigation (current):** `AdygyesNavHost` routes (Map/Search/Favorites); Settings/About/Privacy/Terms are overlays inside `MapScreenContainer` (not NavHost routes)
 - **Back Navigation:** Top app bar with back arrow
 - **Gestures:** 
   - Swipe right: Back
@@ -173,7 +174,7 @@ Based on Adygea flag colors and Material Design 3:
 
 #### Phone (Portrait)
 - **Columns:** 1-2
-- **Navigation:** Bottom navigation
+- **Navigation:** Top app bar actions + standard back; no persistent bottom bar in the current UX
 - **Map controls:** Overlay buttons
 
 #### Phone (Landscape)

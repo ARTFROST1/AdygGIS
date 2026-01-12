@@ -29,7 +29,7 @@
 
 ## Project Directory Layout
 
-> Note: The tree below reflects the actual current state of the codebase (as of 2026-01-06).
+> Note: The tree below is a high-level overview (as of 2026-01-12) and may omit legacy/unused components for clarity.
 
 ```
 AdygGIS-KT/
@@ -147,7 +147,6 @@ AdygGIS-KT/
 │   │   │   │   │   │   │       └── OnboardingScreen.kt
 │   │   │   │   │   │   └── components/   # Reusable UI components
 │   │   │   │   │   │       ├── AccessibilityHelper.kt
-│   │   │   │   │   │       ├── AdygyesBottomNavigation.kt
 │   │   │   │   │   │       ├── AttractionBottomSheet.kt
 │   │   │   │   │   │       ├── AttractionCard.kt
 │   │   │   │   │   │       ├── AttractionsList.kt
@@ -208,7 +207,7 @@ AdygGIS-KT/
 │   ├── wrapper/
 │   └── libs.versions.toml          # Version catalog
 ├── Docs/                           # Documentation
-│   ├── Core/                      # Main project docs (this folder)
+│   ├── README.md                  # Docs index (core docs are in Docs/ root)
 │   ├── fixes/                     # Bug fix documentation
 │   ├── Markers/                   # Marker system documentation
 │   ├── Optimization/              # APK/data optimization guides
@@ -311,7 +310,7 @@ Current offline-first data flow is implemented in these packages:
 - **Zero Visual Lag** - Native MapKit rendering with hardware acceleration
 - **Full Map Interactivity** - Preserved pan, zoom, rotate functionality
 - **Production Ready** - Optimized performance with minimal overhead
-- **Bottom navigation** - Map/List toggle, Favorites, Settings
+- **Навигация (актуально):** `AdygyesNavHost` маршруты (Map/Search/Favorites) + Settings/About/Privacy/Terms как overlay внутри `MapScreenContainer`
 - **Persistent MapHost** - Single `MapView` at app root, `NavHost` rendered inside `MapHost`
 - **Camera state persistence** - `MapStateViewModel` + `PreferencesManager.cameraStateFlow`
 - **Marker persistence** - `VisualMarkerRegistry` + incremental updates in `VisualMarkerProvider`
@@ -330,7 +329,7 @@ Current offline-first data flow is implemented in these packages:
 #### 📱 **UI Components:**
 - **Material Design 3** - Complete theme system with Typography, Colors, Shapes
 - **Responsive Design** - Phone and tablet layouts
-- **Bottom Navigation** - Map, List, Favorites, Settings tabs
+- **Top Bar Controls (актуально)** - основные действия на карте (включая Settings)
 - **Search Bar** - Real-time search with suggestions
 - **Category Carousel** - Horizontal scrolling category filter
 - **Photo Gallery** - Swipeable gallery with zoom support
@@ -378,13 +377,13 @@ Current offline-first data flow is implemented in these packages:
 ### ✅ **Stage 9 - Advanced Map Features:**
 - Implemented dual-layer marker system for 100% click reliability
 - Added dynamic marker clustering with zoom-based grouping
-- Integrated bottom navigation with Map/List toggle
+- UI навигация упрощена: основные действия перенесены в top bar; Settings/About/Privacy/Terms работают как overlay внутри `MapScreenContainer`
 - Added CategoryCarousel for quick filtering
 - Implemented favorites integration in main map screen
 
 ### ✅ **Stage 8 - Navigation & UI Enhancement:**
 - Unified multiple MapScreen implementations into single version
-- Added bottom navigation bar with tabs
+- Навигация: `AdygyesNavHost` (Map/Search/Favorites) + overlay-экраны внутри `MapScreenContainer`
 - Implemented category filtering with bottom sheet
 - Enhanced search with real-time suggestions
 

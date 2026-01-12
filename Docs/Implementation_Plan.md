@@ -40,7 +40,7 @@
 - ✅ **Stage 5:** Core Business Logic (100% complete - 10/10 tasks) ✅
 - ✅ **Stage 6:** Advanced Features (100% complete - 10/10 tasks) ✅
 - ✅ **Stage 7:** UI Refactoring (100% complete - 17/17 tasks) ✅
-- ✅ **Stage 8:** Bottom Navigation + MapScreen Unification (100% complete - 20/20 tasks) ✅
+- ✅ **Stage 8:** Navigation UX + MapScreen Unification (100% complete - 20/20 tasks) ✅
 - ✅ **Stage 9:** Polish & Optimization + Dual-Layer Markers (100% complete - 12/12 tasks) ✅
 - ✅ **Stage 10:** Quality Assurance & Optimization (100% complete - 12/12 tasks) ✅
 - ✅ **Stage 11:** Pre-Launch Preparation (100% complete - 12/12 tasks) ✅
@@ -293,7 +293,7 @@
 
 #### Sub-steps:
 - [x] **Map Screen Enhancement**:
-  - [x] Add list view toggle button in the top bar (later moved to bottom nav)
+  - [x] Add list view toggle button in the top bar
   - [x] Replace "Search places" button with integrated search text field
   - [x] Implement list view for all attractions (similar to search screen)
   - [x] Add smooth transition between map and list views
@@ -338,31 +338,19 @@
 - Preserved all existing map functionality while adding list view
 - Implemented debounced search for better performance
 
-### Stage 8: Bottom Navigation + MapScreen Unification ✅ COMPLETED
+### Stage 8: Navigation UX + MapScreen Unification ✅ COMPLETED
 **Dependencies:** Stage 7 completion
 **Timeline:** Week 16 + MapScreen Consolidation
 **Status:** COMPLETED
 
+> Note (current state 2026-01-12): Navigation is handled by `AdygyesNavHost` (Map/Search/Favorites).
+> Settings/About/Privacy/Terms are overlays inside `MapScreenContainer` (not NavHost routes).
+
 #### Sub-steps:
-- [x] **Bottom Navigation Bar Creation**:
-  - [x] Create BottomNavigationBar composable component (AdygyesBottomNavigation.kt)
-  - [x] Add three navigation items: View Toggle, Favorites, Settings
-  - [x] Implement navigation state management with ViewMode enum
-  - [x] Add icon animations and selected state indicators
-- [x] **Map Screen Restructuring**:
-  - [x] Remove top bar buttons (view toggle, favorites)
-  - [x] Keep only search field with filter button
-  - [x] Remove additional background from search field
-  - [x] Place search field directly above map (floating Surface)
-- [x] **Navigation Integration**:
-  - [x] Connect bottom navigation to navigation controller
-  - [x] Handle screen transitions from bottom nav (Settings, Favorites)
+- [x] **Navigation & Main Screens**:
+  - [x] Consolidate and stabilize navigation between Map/Search/Favorites
+  - [x] Keep search field and filters integrated into the main experience
   - [x] Preserve state between navigation changes
-- [x] **UI Polish**:
-  - [x] Add smooth transitions for bottom nav appearance
-  - [x] Implement proper FAB positioning with bottom nav
-  - [x] Ensure proper insets handling with Scaffold
-  - [x] Add badge support for favorites count
 - [x] **MapScreen Unification** (MAJOR REFACTOR):
   - [x] Analyze all 6 MapScreen variants for best features
   - [x] Create unified MapScreen.kt combining all best practices
@@ -374,18 +362,16 @@
   - [x] Preserve MapScreenTablet.kt for tablet support
 
 #### Completed Features:
-- **AdygyesBottomNavigation Component**: Three-item bottom navigation with animated view toggle
 - **Unified MapScreen**: Single, robust map screen combining all previous versions
 - **Reliable Marker Taps**: 100% guaranteed bottom sheet display on marker clicks
 - **Edge-to-Edge UI**: Modern Android design with proper WindowInsets handling
-- **Navigation Flow**: Integrated Settings and Favorites access from bottom navigation
+- **Navigation Flow**: `AdygyesNavHost` routes + Settings overlay inside `MapScreenContainer`
 - **UI Improvements**: Cleaner interface with more content space and better thumb reachability
 - **Type Safety**: Resolved ViewMode enum conflicts and compilation errors
 
 #### Files Created/Modified:
 - `MapScreen.kt` - ⭐ NEW UNIFIED main map screen (replaces 5 old versions)
 - `CategoryFilterBottomSheet.kt` - NEW category filtering component
-- `AdygyesBottomNavigation.kt` - Bottom navigation bar component
 - `AdygyesNavHost.kt` - Updated navigation routing
 - `strings.xml` - Added nav_list, results_found, clear strings
 - `AppMap_adygyes.md` - Updated UI flow documentation
@@ -596,7 +582,7 @@
   - All MVP features complete and functional
   - Dual-layer marker system with 100% click reliability
   - Dynamic marker clustering implemented
-  - Bottom navigation with Map/List toggle
+  - Map/List toggle with smooth animations
   - Favorites integration with CategoryCarousel
   - Full Russian localization complete
   - Image caching system with Coil
@@ -652,7 +638,7 @@
   - **MapScreen Unification**: Merged 6 different MapScreen files into single unified MapScreen.kt
   - **100% Reliable Marker Taps**: Implemented userData validation and proper tap handling
   - **Edge-to-Edge UI**: Modern Android design with proper WindowInsets handling
-  - **Bottom Navigation**: AdygyesBottomNavigation with Material Design 3 and animated view toggle
+  - Navigation UX polishing and consolidation of main flows
   - **CategoryFilterBottomSheet**: New component for category filtering with real-time updates
   - **Optimized Performance**: Smart marker updates to prevent unnecessary recreation
   - **Debug Support**: Comprehensive logging with emoji indicators for easy debugging

@@ -435,7 +435,6 @@ After implementing the new marker system redesign, several compilation errors oc
 **Related Files:**
 - `app/src/main/java/com/adygyes/app/presentation/ui/map/markers/MarkerOverlay.kt`
 - `app/src/main/java/com/adygyes/app/presentation/ui/screens/map/MapScreen.kt`
-- `app/src/main/java/com/adygyes/app/presentation/ui/components/AdygyesBottomNavigation.kt`
 
 ---
 
@@ -755,7 +754,7 @@ Created template and example
 Use this template for all bug reports
 
 **Related Files:**
-- Docs/Core/Bug_tracking.md
+- Docs/Bug_tracking.md
 
 ---
 
