@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationManager
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -117,5 +118,16 @@ class GetLocationUseCase @Inject constructor(
             context,
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+    }
+    
+    /**
+     * Check if location services are enabled on the device
+     */
+    fun isLocationEnabled(): Boolean {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        return locationManager?.let {
+            it.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+            it.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        } ?: false
     }
 }

@@ -197,6 +197,11 @@
     <string name="results_found">найдено</string>
     <string name="clear">Очистить</string>
     
+    <!-- Location Services -->
+    <string name="location_services_disabled_title">Геолокация выключена</string>
+    <string name="location_services_disabled_message">Для определения вашего местоположения необходимо включить геолокацию в настройках устройства.</string>
+    <string name="location_services_open_settings">Открыть настройки</string>
+    
     <!-- Rating -->
     <string name="rating_coming_soon_title">Скоро в Google Play!</string>
     <string name="rating_coming_soon_description">Приложение ещё не доступно для оценки, но совсем скоро мы выпустим его в Google Play. Следите за обновлениями!</string>

@@ -186,7 +186,7 @@ fun AttractionBottomSheet(
                 }
             )
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             
             // Header row: Title on left, Share + Close on right (RN style)
             Row(
@@ -408,15 +408,9 @@ fun AttractionBottomSheet(
             Spacer(modifier = Modifier.height(16.dp))
             
             // Description
-            Text(
-                text = attraction.description,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 15.sp,
-                    lineHeight = 22.sp
-                ),
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            ExpandableDescription(
+                description = attraction.description,
+                collapsedMaxLines = 3,
                 modifier = Modifier.padding(horizontal = Dimensions.PaddingLarge)
             )
             

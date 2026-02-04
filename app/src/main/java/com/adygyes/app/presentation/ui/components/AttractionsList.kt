@@ -389,14 +389,17 @@ fun AttractionListItem(
                 }
                 
                 // Description
-                Text(
+                ExpandableText(
                     text = attraction.description,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        lineHeight = 16.sp,
+                        fontSize = 12.sp
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 16.sp,
-                    fontSize = 12.sp,
+                    collapsedMaxLines = 2,
+                    expandButtonText = "Ещё",
+                    collapseButtonText = "Скрыть",
+                    showIcon = false,
                     modifier = Modifier.padding(top = 4.dp)
                 )
                 

@@ -447,13 +447,16 @@ fun AttractionCard(
                     
                     // Description (like RN description)
                     if (showDescription) {
-                        Text(
+                        ExpandableText(
                             text = attraction.description,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                lineHeight = 18.sp
+                            ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 18.sp
+                            collapsedMaxLines = 2,
+                            expandButtonText = "Ещё",
+                            collapseButtonText = "Скрыть",
+                            showIcon = true
                         )
                     }
                     

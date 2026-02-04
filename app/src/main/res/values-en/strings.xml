@@ -170,6 +170,11 @@
     <string name="results_found">found</string>
     <string name="clear">Clear</string>
     
+    <!-- Location Services -->
+    <string name="location_services_disabled_title">Location Services Disabled</string>
+    <string name="location_services_disabled_message">To determine your location, please enable location services in your device settings.</string>
+    <string name="location_services_open_settings">Open Settings</string>
+    
     <!-- About Screen -->
     <string name="about_app_slogan">«Discover Adygea Anew»</string>
     <string name="about_app_description">A convenient guide to the most beautiful places in Adygea. Walks, attractions, routes and tips for travelers.</string>

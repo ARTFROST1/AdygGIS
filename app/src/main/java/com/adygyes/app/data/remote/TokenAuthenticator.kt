@@ -107,6 +107,14 @@ class TokenAuthenticator @Inject constructor(
             
             if (response.isSuccessful && response.body() != null) {
                 val authResponse = response.body()!!
+
+                val newAccessToken = authResponse.accessToken
+                val newRefreshToken = authResponse.refreshToken
+                if (newAccessToken.isNullOrBlank() || newRefreshToken.isNullOrBlank()) {
+                    Timber.w("Token refresh response missing tokens; clearing session")
+                    secureAuthPrefs.clearSession()
+                    return null
+                }
                 
                 // Calculate expiration time
                 val expiresAt = authResponse.expiresAt 
@@ -114,8 +122,8 @@ class TokenAuthenticator @Inject constructor(
                 
                 // Update secure storage with new tokens
                 secureAuthPrefs.updateTokens(
-                    accessToken = authResponse.accessToken,
-                    refreshToken = authResponse.refreshToken,
+                    accessToken = newAccessToken,
+                    refreshToken = newRefreshToken,
                     expiresAt = expiresAt
                 )
                 
@@ -123,7 +131,7 @@ class TokenAuthenticator @Inject constructor(
                 
                 // Retry the original request with the new access token
                 originalRequest.newBuilder()
-                    .header(SupabaseConfig.Headers.AUTHORIZATION, "Bearer ${authResponse.accessToken}")
+                    .header(SupabaseConfig.Headers.AUTHORIZATION, "Bearer $newAccessToken")
                     .header(RETRY_COUNT_HEADER, (retryCount + 1).toString())
                     .build()
             } else {
@@ -210,13 +218,20 @@ class ProactiveTokenRefreshInterceptor @Inject constructor(
             
             if (response.isSuccessful && response.body() != null) {
                 val authResponse = response.body()!!
+
+                val newAccessToken = authResponse.accessToken
+                val newRefreshToken = authResponse.refreshToken
+                if (newAccessToken.isNullOrBlank() || newRefreshToken.isNullOrBlank()) {
+                    Timber.w("Proactive token refresh response missing tokens")
+                    return
+                }
                 
                 val expiresAt = authResponse.expiresAt 
                     ?: (System.currentTimeMillis() / 1000 + (authResponse.expiresIn ?: 3600))
                 
                 secureAuthPrefs.updateTokens(
-                    accessToken = authResponse.accessToken,
-                    refreshToken = authResponse.refreshToken,
+                    accessToken = newAccessToken,
+                    refreshToken = newRefreshToken,
                     expiresAt = expiresAt
                 )
                 

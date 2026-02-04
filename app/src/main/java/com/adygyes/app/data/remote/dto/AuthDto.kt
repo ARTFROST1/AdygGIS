@@ -60,9 +60,9 @@ data class PasswordResetRequest(
 @Serializable
 data class AuthResponse(
     @SerialName("access_token")
-    val accessToken: String,
+    val accessToken: String? = null,
     @SerialName("refresh_token")
-    val refreshToken: String,
+    val refreshToken: String? = null,
     @SerialName("token_type")
     val tokenType: String? = null,
     @SerialName("expires_in")
@@ -70,7 +70,61 @@ data class AuthResponse(
     @SerialName("expires_at")
     val expiresAt: Long? = null,
     @SerialName("user")
-    val user: AuthUserDto
+    val user: AuthUserDto? = null
+)
+
+/**
+ * Response from Supabase Auth sign up endpoint.
+ *
+ * GoTrue /auth/v1/signup may return either:
+ * 1) A user object at the top level (most common when email confirmation is enabled)
+ * 2) A token-style payload similar to AuthResponse (when a session is issued)
+ *
+ * This DTO supports both shapes to avoid treating successful signups as errors.
+ */
+@Serializable
+data class SignUpResponse(
+    // Token-style fields (may be absent)
+    @SerialName("access_token")
+    val accessToken: String? = null,
+    @SerialName("refresh_token")
+    val refreshToken: String? = null,
+    @SerialName("token_type")
+    val tokenType: String? = null,
+    @SerialName("expires_in")
+    val expiresIn: Int? = null,
+    @SerialName("expires_at")
+    val expiresAt: Long? = null,
+    @SerialName("user")
+    val user: AuthUserDto? = null,
+
+    // User-at-top-level fields
+    @SerialName("id")
+    val id: String? = null,
+    @SerialName("email")
+    val email: String? = null,
+    @SerialName("email_confirmed_at")
+    val emailConfirmedAt: String? = null,
+    @SerialName("user_metadata")
+    val userMetadata: AuthUserMetadataDto? = null,
+    @SerialName("app_metadata")
+    val appMetadata: AppMetadataDto? = null,
+    @SerialName("created_at")
+    val createdAt: String? = null,
+    @SerialName("updated_at")
+    val updatedAt: String? = null,
+
+    // Error payload fields (Supabase sometimes responds with 200 OK + error JSON)
+    @SerialName("error")
+    val error: String? = null,
+    @SerialName("error_description")
+    val errorDescription: String? = null,
+    @SerialName("msg")
+    val msg: String? = null,
+    @SerialName("message")
+    val message: String? = null,
+    @SerialName("code")
+    val code: String? = null
 )
 
 /**

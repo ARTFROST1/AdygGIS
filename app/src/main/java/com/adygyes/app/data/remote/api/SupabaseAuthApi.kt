@@ -5,6 +5,7 @@ import com.adygyes.app.data.remote.dto.PasswordResetRequest
 import com.adygyes.app.data.remote.dto.RefreshTokenRequest
 import com.adygyes.app.data.remote.dto.SignInRequest
 import com.adygyes.app.data.remote.dto.SignUpRequest
+import com.adygyes.app.data.remote.dto.SignUpResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -36,7 +37,7 @@ interface SupabaseAuthApi {
     @POST("auth/v1/signup")
     suspend fun signUp(
         @Body request: SignUpRequest
-    ): Response<AuthResponse>
+    ): Response<SignUpResponse>
     
     /**
      * Refresh access token using refresh token

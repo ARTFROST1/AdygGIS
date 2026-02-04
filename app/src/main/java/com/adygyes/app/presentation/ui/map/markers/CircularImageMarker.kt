@@ -172,7 +172,7 @@ fun CircularImageMarker(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     onLoading = {
                         isLoading = true
                         hasError = false

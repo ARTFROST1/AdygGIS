@@ -48,7 +48,7 @@ fun SearchResultsPanel(
     var offsetY by remember { mutableFloatStateOf(screenHeight) }
     
     // State positions - account for search bar and category filters
-    val searchBarHeight = 120.dp // Height of search bar + padding
+    val searchBarHeight = 145.dp // Height of search bar + padding (increased for more space)
     val categoryFiltersHeight = 40.dp // Height of category filters block + consistent spacing
     val totalTopHeight = searchBarHeight + categoryFiltersHeight // Total reserved top area
     val totalTopHeightPx = with(density) { totalTopHeight.toPx() }

@@ -55,6 +55,7 @@ import com.adygyes.app.presentation.ui.components.SearchResultsHeader
 import com.adygyes.app.presentation.ui.components.UnifiedCategoryCarousel
 import com.adygyes.app.presentation.ui.components.DataUpdateOverlay
 import com.adygyes.app.presentation.ui.components.SearchResultsPanel
+import com.adygyes.app.presentation.ui.components.LocationServicesDialog
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.adygyes.app.presentation.ui.map.markers.DualLayerMarkerSystem
@@ -842,6 +843,13 @@ fun MapScreen(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
+        }
+        
+        // Диалог напоминания о включении геолокации
+        if (uiState.showLocationServicesDialog) {
+            LocationServicesDialog(
+                onDismiss = { viewModel.dismissLocationServicesDialog() }
+            )
         }
         
         // Bottom navigation removed - buttons moved to top bar

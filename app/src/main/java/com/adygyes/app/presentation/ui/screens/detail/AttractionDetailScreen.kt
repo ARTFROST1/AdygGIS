@@ -332,10 +332,9 @@ fun AttractionDetailScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = attraction.description,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            ExpandableDescription(
+                                description = attraction.description,
+                                collapsedMaxLines = 4
                             )
                         }
                     }

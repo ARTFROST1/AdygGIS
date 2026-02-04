@@ -630,6 +630,16 @@ class MapViewModel @Inject constructor(
                 return@launch
             }
             
+            // Проверяем, включены ли Location Services на устройстве
+            if (!getLocationUseCase.isLocationEnabled()) {
+                Timber.w("⚠️ Location services are disabled on device")
+                _uiState.update { it.copy(
+                    showLocationServicesDialog = true,
+                    isLoadingLocation = false
+                ) }
+                return@launch
+            }
+            
             try {
                 _uiState.update { it.copy(isLoadingLocation = true) }
                 val location = getLocationUseCase.getCurrentLocation()
@@ -665,6 +675,13 @@ class MapViewModel @Inject constructor(
      */
     fun moveToUserLocation(mapView: com.yandex.mapkit.mapview.MapView?) {
         viewModelScope.launch {
+            // Проверяем, включены ли Location Services на устройстве
+            if (getLocationUseCase.hasLocationPermission() && !getLocationUseCase.isLocationEnabled()) {
+                Timber.w("⚠️ Permission granted but location services disabled")
+                _uiState.update { it.copy(showLocationServicesDialog = true) }
+                return@launch
+            }
+            
             val userLocation = _uiState.value.userLocation
             if (userLocation != null && mapView != null) {
                 try {
@@ -696,6 +713,10 @@ class MapViewModel @Inject constructor(
                 }
             }
         }
+    }
+    
+    fun dismissLocationServicesDialog() {
+        _uiState.update { it.copy(showLocationServicesDialog = false) }
     }
     
     fun navigateToAttraction(attraction: Attraction) {
@@ -1051,5 +1072,6 @@ data class MapUiState(
     val showUserLocationMarker: Boolean = false,
     val isOnline: Boolean = true,
     val networkStatus: NetworkStatus? = null,
-    val recommendedAttractions: List<Attraction> = emptyList()
+    val recommendedAttractions: List<Attraction> = emptyList(),
+    val showLocationServicesDialog: Boolean = false
 )

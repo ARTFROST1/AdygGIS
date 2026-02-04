@@ -9,6 +9,7 @@ import com.adygyes.app.data.remote.dto.PasswordResetRequest
 import com.adygyes.app.data.remote.dto.RefreshTokenRequest
 import com.adygyes.app.data.remote.dto.SignInRequest
 import com.adygyes.app.data.remote.dto.SignUpRequest
+import com.adygyes.app.data.remote.dto.SignUpResponse
 import com.adygyes.app.data.remote.dto.UserMetadata
 import com.adygyes.app.domain.model.AuthState
 import com.adygyes.app.domain.model.User
@@ -176,8 +177,12 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 try {
                     val authResponse = response.body()!!
-                    handleAuthSuccess(authResponse)
-                    Result.success(authResponseToUser(authResponse))
+                    val user = handleAuthSuccess(authResponse)
+                    Result.success(user)
+                } catch (e: AuthException) {
+                    val message = e.message ?: "Ошибка входа"
+                    _authState.value = AuthState.Error(message)
+                    Result.failure(e)
                 } catch (e: kotlinx.serialization.SerializationException) {
                     // Response was 200 OK but body is an error
                     Timber.w(e, "Sign in response deserialization failed - likely error response")
@@ -222,21 +227,29 @@ class AuthRepository @Inject constructor(
             )
             
             val response = authApi.signUp(request)
-            
+
             if (response.isSuccessful && response.body() != null) {
                 try {
-                    val authResponse = response.body()!!
-                    
-                    // Check if email confirmation is required
-                    // If emailConfirmedAt is null, user needs to confirm email
-                    if (authResponse.user.emailConfirmedAt == null) {
+                    val signUpResponse = response.body()!!
+
+                    val user = signUpResponseToUser(signUpResponse)
+
+                    // /signup usually does NOT return a session when email confirmation is enabled.
+                    // Treat this as a successful signup (email sent, user created) and ask user to confirm email.
+                    val hasSession = !signUpResponse.accessToken.isNullOrBlank() && !signUpResponse.refreshToken.isNullOrBlank()
+                    if (!hasSession) {
                         _authState.value = AuthState.Unauthenticated
-                        // Return success but user needs to confirm email
-                        return Result.success(authResponseToUser(authResponse))
+                        return Result.success(user)
                     }
-                    
-                    handleAuthSuccess(authResponse)
-                    Result.success(authResponseToUser(authResponse))
+
+                    // Some configurations may issue a session on signup.
+                    val authResponse = signUpResponseToAuthResponse(signUpResponse)
+                    val authedUser = handleAuthSuccess(authResponse)
+                    Result.success(authedUser)
+                } catch (e: AuthException) {
+                    val message = e.message ?: "Ошибка регистрации"
+                    _authState.value = AuthState.Error(message)
+                    Result.failure(e)
                 } catch (e: kotlinx.serialization.SerializationException) {
                     // Response was 200 OK but body is an error (Supabase sometimes does this)
                     Timber.w(e, "Sign up response deserialization failed - likely error response")
@@ -308,8 +321,16 @@ class AuthRepository @Inject constructor(
             val response = authApi.refreshToken(RefreshTokenRequest(token))
             
             if (response.isSuccessful && response.body() != null) {
-                handleAuthSuccess(response.body()!!)
-                Result.success(Unit)
+                try {
+                    handleAuthSuccess(response.body()!!)
+                    Result.success(Unit)
+                } catch (e: AuthException) {
+                    // Token response is invalid -> clear session
+                    secureAuthPrefs.clearSession()
+                    currentAccessToken = null
+                    _authState.value = AuthState.Unauthenticated
+                    Result.failure(e)
+                }
             } else {
                 // Token invalid, clear session
                 secureAuthPrefs.clearSession()
@@ -364,7 +385,12 @@ class AuthRepository @Inject constructor(
     
     // ===== Private helpers =====
     
-    private suspend fun handleAuthSuccess(authResponse: AuthResponse) {
+    private suspend fun handleAuthSuccess(authResponse: AuthResponse): User {
+        val accessToken = authResponse.accessToken?.takeIf { it.isNotBlank() }
+            ?: throw AuthException("Сервер не вернул access token")
+        val refreshToken = authResponse.refreshToken?.takeIf { it.isNotBlank() }
+            ?: throw AuthException("Сервер не вернул refresh token")
+
         val user = authResponseToUser(authResponse)
         
         // Calculate expiration time (Supabase returns seconds or timestamp)
@@ -373,8 +399,8 @@ class AuthRepository @Inject constructor(
         
         // Save to secure preferences with expiration time
         secureAuthPrefs.saveSession(
-            accessToken = authResponse.accessToken,
-            refreshToken = authResponse.refreshToken,
+            accessToken = accessToken,
+            refreshToken = refreshToken,
             expiresAt = expiresAt,
             userId = user.id,
             email = user.email,
@@ -383,24 +409,85 @@ class AuthRepository @Inject constructor(
         )
         
         // Update in-memory token
-        currentAccessToken = authResponse.accessToken
+        currentAccessToken = accessToken
         
         // Update state
         _authState.value = AuthState.Authenticated(
             user = user,
-            accessToken = authResponse.accessToken,
-            refreshToken = authResponse.refreshToken
+            accessToken = accessToken,
+            refreshToken = refreshToken
         )
         
         Timber.d("Auth success for user: ${user.email}, token expires at: ${java.util.Date(expiresAt * 1000)}")
+
+        return user
     }
     
     private fun authResponseToUser(response: AuthResponse): User {
+        val userDto = response.user ?: throw AuthException("Сервер не вернул данные пользователя")
         return User(
-            id = response.user.id,
-            email = response.user.email ?: "",
-            displayName = response.user.userMetadata?.displayName,
-            avatarUrl = response.user.userMetadata?.avatarUrl
+            id = userDto.id,
+            email = userDto.email ?: "",
+            displayName = userDto.userMetadata?.displayName,
+            avatarUrl = userDto.userMetadata?.avatarUrl
+        )
+    }
+
+    private fun signUpResponseToUser(response: SignUpResponse): User {
+        val rawErrorMessage = response.errorDescription
+            ?: response.msg
+            ?: response.message
+            ?: response.error
+        if (!rawErrorMessage.isNullOrBlank()) {
+            throw AuthException(translateAuthError(rawErrorMessage))
+        }
+
+        val userDto = response.user
+        if (userDto != null) {
+            return User(
+                id = userDto.id,
+                email = userDto.email ?: "",
+                displayName = userDto.userMetadata?.displayName,
+                avatarUrl = userDto.userMetadata?.avatarUrl
+            )
+        }
+
+        val id = response.id
+        if (id.isNullOrBlank()) {
+            throw AuthException("Сервер не вернул данные пользователя")
+        }
+
+        return User(
+            id = id,
+            email = response.email ?: "",
+            displayName = response.userMetadata?.displayName,
+            avatarUrl = response.userMetadata?.avatarUrl
+        )
+    }
+
+    private fun signUpResponseToAuthResponse(response: SignUpResponse): AuthResponse {
+        val userDto = response.user ?: run {
+            val id = response.id
+                ?: throw AuthException("Сервер не вернул данные пользователя")
+
+            com.adygyes.app.data.remote.dto.AuthUserDto(
+                id = id,
+                email = response.email,
+                emailConfirmedAt = response.emailConfirmedAt,
+                userMetadata = response.userMetadata,
+                appMetadata = response.appMetadata,
+                createdAt = response.createdAt,
+                updatedAt = response.updatedAt
+            )
+        }
+
+        return AuthResponse(
+            accessToken = response.accessToken,
+            refreshToken = response.refreshToken,
+            tokenType = response.tokenType,
+            expiresIn = response.expiresIn,
+            expiresAt = response.expiresAt,
+            user = userDto
         )
     }
     
