@@ -1,6 +1,7 @@
 package com.adygyes.app.presentation.ui.screens.about
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -221,8 +222,11 @@ fun AboutScreen(
                             }
                         }
                         
-                        // Developer 2
+                        // Developer 2 (clickable → telegram)
                         Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { ShareUtils.openUrl(context, settings.telegramUrl2) },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
@@ -242,7 +246,9 @@ fun AboutScreen(
                             
                             Spacer(modifier = Modifier.width(16.dp))
                             
-                            Column {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(
                                     text = settings.developer2Name,
                                     style = MaterialTheme.typography.bodyLarge,
@@ -255,6 +261,12 @@ fun AboutScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -328,6 +340,21 @@ fun AboutScreen(
                             value = settings.telegramHandle,
                             onClick = {
                                 ShareUtils.openUrl(context, settings.telegramUrl)
+                            }
+                        )
+                        
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        )
+                        
+                        ContactLink(
+                            icon = Icons.AutoMirrored.Filled.Send,
+                            label = "Telegram разработчика",
+                            value = settings.telegramHandle2,
+                            onClick = {
+                                ShareUtils.openUrl(context, settings.telegramUrl2)
                             }
                         )
                     }

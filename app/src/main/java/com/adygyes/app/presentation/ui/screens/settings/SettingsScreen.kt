@@ -368,7 +368,7 @@ fun SettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = stringResource(R.string.settings_about_app),
-                    subtitle = "${stringResource(R.string.settings_version)} ${uiState.appVersion}",
+                    subtitle = "${stringResource(R.string.settings_version)} ${appSettings.appVersion}",
                     onClick = {
                         viewModel.onVersionClick()
                         onNavigateToAbout()

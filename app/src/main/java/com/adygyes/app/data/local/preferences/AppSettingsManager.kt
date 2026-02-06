@@ -30,6 +30,8 @@ class AppSettingsManager @Inject constructor(
         private val KEY_SUPPORT_EMAIL = stringPreferencesKey("app_settings_support_email")
         private val KEY_TELEGRAM_URL = stringPreferencesKey("app_settings_telegram_url")
         private val KEY_TELEGRAM_HANDLE = stringPreferencesKey("app_settings_telegram_handle")
+        private val KEY_TELEGRAM_URL_2 = stringPreferencesKey("app_settings_telegram_url_2")
+        private val KEY_TELEGRAM_HANDLE_2 = stringPreferencesKey("app_settings_telegram_handle_2")
         private val KEY_GOOGLE_PLAY_URL = stringPreferencesKey("app_settings_google_play_url")
         private val KEY_APP_STORE_URL = stringPreferencesKey("app_settings_app_store_url")
         private val KEY_APP_VERSION = stringPreferencesKey("app_settings_app_version")
@@ -46,6 +48,8 @@ class AppSettingsManager @Inject constructor(
         const val DEFAULT_SUPPORT_EMAIL = "frostmoontechsmc@gmail.com"
         const val DEFAULT_TELEGRAM_URL = "https://t.me/MaykopTech"
         const val DEFAULT_TELEGRAM_HANDLE = "@MaykopTech"
+        const val DEFAULT_TELEGRAM_URL_2 = "https://t.me/ArtFrost"
+        const val DEFAULT_TELEGRAM_HANDLE_2 = "@ArtFrost"
         const val DEFAULT_GOOGLE_PLAY_URL = "https://play.google.com/store/apps/details?id=com.adygyes.app"
         const val DEFAULT_APP_STORE_URL = ""
         const val DEFAULT_APP_VERSION = "1.0.0"
@@ -62,6 +66,8 @@ class AppSettingsManager @Inject constructor(
             "support_email" to KEY_SUPPORT_EMAIL,
             "telegram_url" to KEY_TELEGRAM_URL,
             "telegram_handle" to KEY_TELEGRAM_HANDLE,
+            "telegram_url_2" to KEY_TELEGRAM_URL_2,
+            "telegram_handle_2" to KEY_TELEGRAM_HANDLE_2,
             "google_play_url" to KEY_GOOGLE_PLAY_URL,
             "app_store_url" to KEY_APP_STORE_URL,
             "app_version" to KEY_APP_VERSION,
@@ -82,6 +88,8 @@ class AppSettingsManager @Inject constructor(
         val supportEmail: String = DEFAULT_SUPPORT_EMAIL,
         val telegramUrl: String = DEFAULT_TELEGRAM_URL,
         val telegramHandle: String = DEFAULT_TELEGRAM_HANDLE,
+        val telegramUrl2: String = DEFAULT_TELEGRAM_URL_2,
+        val telegramHandle2: String = DEFAULT_TELEGRAM_HANDLE_2,
         val googlePlayUrl: String = DEFAULT_GOOGLE_PLAY_URL,
         val appStoreUrl: String = DEFAULT_APP_STORE_URL,
         val appVersion: String = DEFAULT_APP_VERSION,
@@ -102,6 +110,8 @@ class AppSettingsManager @Inject constructor(
             supportEmail = prefs[KEY_SUPPORT_EMAIL] ?: DEFAULT_SUPPORT_EMAIL,
             telegramUrl = prefs[KEY_TELEGRAM_URL] ?: DEFAULT_TELEGRAM_URL,
             telegramHandle = prefs[KEY_TELEGRAM_HANDLE] ?: DEFAULT_TELEGRAM_HANDLE,
+            telegramUrl2 = prefs[KEY_TELEGRAM_URL_2] ?: DEFAULT_TELEGRAM_URL_2,
+            telegramHandle2 = prefs[KEY_TELEGRAM_HANDLE_2] ?: DEFAULT_TELEGRAM_HANDLE_2,
             googlePlayUrl = prefs[KEY_GOOGLE_PLAY_URL] ?: DEFAULT_GOOGLE_PLAY_URL,
             appStoreUrl = prefs[KEY_APP_STORE_URL] ?: DEFAULT_APP_STORE_URL,
             appVersion = prefs[KEY_APP_VERSION] ?: DEFAULT_APP_VERSION,
