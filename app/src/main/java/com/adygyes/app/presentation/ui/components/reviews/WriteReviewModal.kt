@@ -1,11 +1,15 @@
 package com.adygyes.app.presentation.ui.components.reviews
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -18,7 +22,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,6 +39,11 @@ import com.adygyes.app.presentation.theme.Dimensions
  * Write Review Modal Component
  * Модальное окно для написания отзыва
  * Unified with RN WriteReviewModal component
+ * 
+ * Keyboard Handling Best Practices:
+ * - Uses imePadding() for proper keyboard avoidance
+ * - Auto-scrolls to focused text field
+ * - Optimized for all screen sizes
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +61,13 @@ fun WriteReviewModal(
     
     var rating by remember { mutableIntStateOf(initialRating) }
     var text by remember { mutableStateOf("") }
+    val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val textFieldFocusRequester = remember { FocusRequester() }
+    
+    // Track keyboard visibility for optimized scrolling
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     
     // Reset state when modal opens
     LaunchedEffect(visible) {
@@ -56,12 +77,25 @@ fun WriteReviewModal(
         }
     }
     
+    // Auto-scroll to text field when keyboard appears
+    LaunchedEffect(imeVisible) {
+        if (imeVisible) {
+            // Small delay to let keyboard animation complete
+            kotlinx.coroutines.delay(100)
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+    }
+    
     Dialog(
-        onDismissRequest = onClose,
+        onDismissRequest = {
+            keyboardController?.hide()
+            onClose()
+        },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnBackPress = true,
-            dismissOnClickOutside = true
+            dismissOnClickOutside = true,
+            decorFitsSystemWindows = false // Critical for proper keyboard handling
         )
     ) {
         Box(
@@ -71,17 +105,18 @@ fun WriteReviewModal(
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
-                ) { onClose() },
+                ) { 
+                    keyboardController?.hide()
+                    onClose() 
+                }
+                .systemBarsPadding(), // Handle system bars
             contentAlignment = Alignment.BottomCenter
         ) {
-            // Modal content
+            // Modal content with keyboard-aware layout
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.7f)
-                    // Edge-to-edge: add insets padding for keyboard and navigation bar
-                    .navigationBarsPadding()
-                    .imePadding()
+                    .imePadding() // Key: moves content above keyboard
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -90,7 +125,16 @@ fun WriteReviewModal(
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // Dynamic height: smaller when keyboard is visible
+                        .let { mod ->
+                            if (imeVisible) {
+                                mod.heightIn(max = 400.dp) // Compact when keyboard shown
+                            } else {
+                                mod.fillMaxHeight(0.65f) // Normal height
+                            }
+                        }
                 ) {
                     // Header
                     Row(
@@ -116,11 +160,11 @@ fun WriteReviewModal(
                         }
                     }
                     
-                    // Content
+                    // Content - scrollable
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(scrollState)
                             .padding(horizontal = Dimensions.PaddingLarge)
                     ) {
                         // Attraction name
@@ -131,37 +175,39 @@ fun WriteReviewModal(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(if (imeVisible) 16.dp else 24.dp))
                         
-                        // Rating section
+                        // Rating section - compact when keyboard visible
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Interactive stars
+                            // Interactive stars - smaller when keyboard visible
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(if (imeVisible) 8.dp else 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 repeat(5) { index ->
                                     val starIndex = index + 1
                                     val isFilled = starIndex <= rating
+                                    val starSize = if (imeVisible) 32.dp else 40.dp
+                                    val buttonSize = if (imeVisible) 40.dp else 48.dp
                                     
                                     IconButton(
                                         onClick = { rating = starIndex },
-                                        modifier = Modifier.size(48.dp)
+                                        modifier = Modifier.size(buttonSize)
                                     ) {
                                         Icon(
                                             imageVector = if (isFilled) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                             contentDescription = "Оценка $starIndex",
-                                            modifier = Modifier.size(40.dp),
+                                            modifier = Modifier.size(starSize),
                                             tint = if (isFilled) Color(0xFFFFB300) else MaterialTheme.colorScheme.outline
                                         )
                                     }
                                 }
                             }
                             
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(if (imeVisible) 8.dp else 12.dp))
                             
                             // Rating label
                             Text(
@@ -175,15 +221,16 @@ fun WriteReviewModal(
                             )
                         }
                         
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(if (imeVisible) 16.dp else 24.dp))
                         
-                        // Text input
+                        // Text input - adaptive height
                         OutlinedTextField(
                             value = text,
                             onValueChange = { text = it },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(180.dp),
+                                .height(if (imeVisible) 120.dp else 180.dp) // Smaller when keyboard visible
+                                .focusRequester(textFieldFocusRequester),
                             placeholder = {
                                 Text(
                                     text = "Напишите отзыв (необязательно)...",
@@ -197,7 +244,7 @@ fun WriteReviewModal(
                             shape = RoundedCornerShape(12.dp)
                         )
                         
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(if (imeVisible) 8.dp else 16.dp))
 
                         if (!errorMessage.isNullOrBlank()) {
                             Text(
@@ -205,15 +252,18 @@ fun WriteReviewModal(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
                     
-                    // Footer buttons
+                    // Footer buttons - always visible above keyboard
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(Dimensions.PaddingLarge),
+                            .padding(
+                                horizontal = Dimensions.PaddingLarge,
+                                vertical = if (imeVisible) 8.dp else Dimensions.PaddingLarge
+                            ),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Cancel button

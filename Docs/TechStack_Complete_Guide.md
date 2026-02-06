@@ -9,7 +9,9 @@
 **UI Framework:** Jetpack Compose (BOM 2024.12.01)  
 **Build System:** Gradle 8.13 with Kotlin DSL, AGP 8.7.3  
 **Version:** 1.0.1 (versionCode 3)  
-**Last Updated:** 2026-01-12
+**Last Updated:** 2026-02-06
+
+**Server-driven settings:** `app_settings` (Supabase) — динамические контакты/ссылки/тексты для экранов Settings/About/Privacy/Terms (кэш в DataStore через `AppSettingsManager`, синк в `SyncService`).
 
 ---
 

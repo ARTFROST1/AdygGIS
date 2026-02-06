@@ -11,8 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -32,7 +30,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,6 +57,12 @@ enum class AuthMode {
 /**
  * Auth Modal Component for login/register/password reset
  * Unified with RN AuthModal component
+ * 
+ * Keyboard Handling Best Practices:
+ * - Uses imePadding() for proper keyboard avoidance
+ * - Auto-scrolls to focused input field
+ * - Adaptive spacing when keyboard is visible
+ * - Optimized for all screen sizes
  * 
  * Improvements:
  * - Password strength indicator for sign up
@@ -87,6 +93,11 @@ fun AuthModal(
     var passwordVisible by remember { mutableStateOf(false) }
     
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val scrollState = rememberScrollState()
+    
+    // Track keyboard visibility for adaptive layout
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     
     // Reset state when modal opens
     LaunchedEffect(visible) {
@@ -104,12 +115,24 @@ fun AuthModal(
         onClearError()
     }
     
+    // Auto-scroll when keyboard appears
+    LaunchedEffect(imeVisible) {
+        if (imeVisible) {
+            kotlinx.coroutines.delay(100)
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+    }
+    
     Dialog(
-        onDismissRequest = onClose,
+        onDismissRequest = {
+            keyboardController?.hide()
+            onClose()
+        },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnBackPress = true,
-            dismissOnClickOutside = true
+            dismissOnClickOutside = true,
+            decorFitsSystemWindows = false // Critical for proper keyboard handling
         )
     ) {
         Box(
@@ -119,17 +142,18 @@ fun AuthModal(
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
-                ) { onClose() },
+                ) { 
+                    keyboardController?.hide()
+                    onClose() 
+                }
+                .systemBarsPadding(), // Handle system bars
             contentAlignment = Alignment.BottomCenter
         ) {
-            // Modal content
+            // Modal content with keyboard-aware layout
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.85f)
-                    // Edge-to-edge: add insets padding for keyboard and navigation bar
-                    .navigationBarsPadding()
-                    .imePadding()
+                    .imePadding() // Key: moves content above keyboard
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -138,7 +162,16 @@ fun AuthModal(
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // Dynamic height based on keyboard visibility
+                        .let { mod ->
+                            if (imeVisible) {
+                                mod.heightIn(max = 450.dp) // Compact when keyboard shown
+                            } else {
+                                mod.fillMaxHeight(0.8f) // Normal height
+                            }
+                        }
                 ) {
                     // Header
                     Row(
@@ -168,11 +201,11 @@ fun AuthModal(
                         }
                     }
                     
-                    // Content
+                    // Content - scrollable
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(scrollState)
                             .padding(horizontal = Dimensions.PaddingLarge)
                     ) {
                         // Description text
@@ -184,7 +217,7 @@ fun AuthModal(
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 24.dp)
+                            modifier = Modifier.padding(bottom = if (imeVisible) 16.dp else 24.dp)
                         )
                         
                         // Display name field (sign up only)
@@ -194,7 +227,7 @@ fun AuthModal(
                                 onValueChange = { displayName = it },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(bottom = 16.dp),
+                                    .padding(bottom = if (imeVisible) 12.dp else 16.dp),
                                 label = { Text("Ваше имя") },
                                 placeholder = { Text("Как вас называть?") },
                                 leadingIcon = {
@@ -221,7 +254,7 @@ fun AuthModal(
                             onValueChange = { email = it.trim() },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 16.dp),
+                                .padding(bottom = if (imeVisible) 12.dp else 16.dp),
                             label = { Text("Email") },
                             placeholder = { Text("example@mail.com") },
                             leadingIcon = {
@@ -259,7 +292,7 @@ fun AuthModal(
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(bottom = 8.dp),
+                                        .padding(bottom = if (imeVisible) 4.dp else 8.dp),
                                     label = { Text("Пароль") },
                                     placeholder = { Text("Минимум 6 символов") },
                                     leadingIcon = {
@@ -310,7 +343,7 @@ fun AuthModal(
                                 ) {
                                     PasswordStrengthIndicator(
                                         strength = passwordStrength,
-                                        modifier = Modifier.padding(bottom = 8.dp)
+                                        modifier = Modifier.padding(bottom = if (imeVisible) 4.dp else 8.dp)
                                     )
                                 }
                             }
@@ -322,7 +355,7 @@ fun AuthModal(
                                 text = errorMessage ?: "",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.padding(bottom = 16.dp)
+                                modifier = Modifier.padding(bottom = if (imeVisible) 8.dp else 16.dp)
                             )
                         }
                         
@@ -339,12 +372,13 @@ fun AuthModal(
                             }
                         }
                         
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(if (imeVisible) 4.dp else 8.dp))
                         
                         // Main action button
                         Button(
                             onClick = {
                                 focusManager.clearFocus()
+                                keyboardController?.hide()
                                 when (authMode) {
                                     AuthMode.SIGN_IN -> onSignIn(email, password)
                                     AuthMode.SIGN_UP -> onSignUp(email, password, displayName.takeIf { it.isNotBlank() })
@@ -353,7 +387,7 @@ fun AuthModal(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(52.dp),
+                                .height(if (imeVisible) 48.dp else 52.dp),
                             enabled = !isLoading,
                             shape = RoundedCornerShape(12.dp)
                         ) {
@@ -376,24 +410,49 @@ fun AuthModal(
                             }
                         }
                         
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(if (imeVisible) 12.dp else 24.dp))
                         
-                        // Toggle between sign in and sign up
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = when (authMode) {
-                                    AuthMode.SIGN_IN -> "Нет аккаунта?"
-                                    AuthMode.SIGN_UP -> "Уже есть аккаунт?"
-                                    AuthMode.FORGOT_PASSWORD -> "Вспомнили пароль?"
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        // Toggle between sign in and sign up - hide when keyboard is visible for more space
+                        if (!imeVisible) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = when (authMode) {
+                                        AuthMode.SIGN_IN -> "Нет аккаунта?"
+                                        AuthMode.SIGN_UP -> "Уже есть аккаунт?"
+                                        AuthMode.FORGOT_PASSWORD -> "Вспомнили пароль?"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                
+                                TextButton(
+                                    onClick = {
+                                        authMode = when (authMode) {
+                                            AuthMode.SIGN_IN -> AuthMode.SIGN_UP
+                                            AuthMode.SIGN_UP -> AuthMode.SIGN_IN
+                                            AuthMode.FORGOT_PASSWORD -> AuthMode.SIGN_IN
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        text = when (authMode) {
+                                            AuthMode.SIGN_IN -> "Зарегистрироваться"
+                                            AuthMode.SIGN_UP -> "Войти"
+                                            AuthMode.FORGOT_PASSWORD -> "Войти"
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                             
+                            Spacer(modifier = Modifier.height(32.dp))
+                        } else {
+                            // Compact mode toggle when keyboard visible
                             TextButton(
                                 onClick = {
                                     authMode = when (authMode) {
@@ -401,21 +460,21 @@ fun AuthModal(
                                         AuthMode.SIGN_UP -> AuthMode.SIGN_IN
                                         AuthMode.FORGOT_PASSWORD -> AuthMode.SIGN_IN
                                     }
-                                }
+                                },
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
                             ) {
                                 Text(
                                     text = when (authMode) {
-                                        AuthMode.SIGN_IN -> "Зарегистрироваться"
+                                        AuthMode.SIGN_IN -> "Регистрация"
                                         AuthMode.SIGN_UP -> "Войти"
                                         AuthMode.FORGOT_PASSWORD -> "Войти"
                                     },
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
-                        
-                        Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
             }

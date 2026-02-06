@@ -20,11 +20,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.adygyes.app.R
 import com.adygyes.app.presentation.theme.Dimensions
 import com.adygyes.app.presentation.ui.components.info.InfoCard
 import com.adygyes.app.presentation.ui.components.info.ContactLink
 import com.adygyes.app.presentation.ui.util.ShareUtils
+import com.adygyes.app.presentation.viewmodel.AppSettingsViewModel
 import android.widget.Toast
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -32,19 +34,35 @@ import kotlinx.coroutines.launch
 /**
  * About screen showing app information, version, developers and contact details
  * Modern design with cards and social links
+ * 
+ * Uses AppSettingsViewModel to display dynamic settings from Admin Panel
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(
     onNavigateBack: () -> Unit,
     onNavigateToPrivacy: () -> Unit = {},
-    onNavigateToTerms: () -> Unit = {}
+    onNavigateToTerms: () -> Unit = {},
+    viewModel: AppSettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
+    // App settings from Admin Panel (synced via Supabase)
+    val settings by viewModel.settings.collectAsState()
+    
     // Protection against double-click on back button
     var isNavigating by remember { mutableStateOf(false) }
+    
+    // Generate initials from developer names
+    fun getInitials(fullName: String): String {
+        return fullName.split(" ")
+            .filter { it.isNotBlank() }
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+            .joinToString("")
+            .ifEmpty { "?" }
+    }
     
     Scaffold(
         // Edge-to-edge: use system bars insets
@@ -126,7 +144,7 @@ fun AboutScreen(
                     
                     // App Slogan
                     Text(
-                        text = stringResource(R.string.about_app_slogan),
+                        text = settings.appSlogan,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center
@@ -136,7 +154,7 @@ fun AboutScreen(
                     
                     // Version
                     Text(
-                        text = stringResource(R.string.about_version_full, stringResource(R.string.about_version_number)),
+                        text = stringResource(R.string.about_version_full, settings.appVersion),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -150,7 +168,7 @@ fun AboutScreen(
                     icon = Icons.Default.Info
                 ) {
                     Text(
-                        text = stringResource(R.string.about_app_description),
+                        text = settings.appDescription,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
@@ -178,7 +196,7 @@ fun AboutScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
-                                        text = "SS",
+                                        text = getInitials(settings.developer1Name),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -190,13 +208,13 @@ fun AboutScreen(
                             
                             Column {
                                 Text(
-                                    text = stringResource(R.string.about_developer_salim),
+                                    text = settings.developer1Name,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = stringResource(R.string.about_developer_role),
+                                    text = settings.developer1Role,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -214,7 +232,7 @@ fun AboutScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
-                                        text = "MA",
+                                        text = getInitials(settings.developer2Name),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -226,13 +244,13 @@ fun AboutScreen(
                             
                             Column {
                                 Text(
-                                    text = stringResource(R.string.about_developer_artem),
+                                    text = settings.developer2Name,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = stringResource(R.string.about_developer_role),
+                                    text = settings.developer2Role,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -252,9 +270,9 @@ fun AboutScreen(
                         ContactLink(
                             icon = Icons.Default.Language,
                             label = stringResource(R.string.contact_website),
-                            value = stringResource(R.string.settings_support_website_value),
+                            value = settings.websiteUrl.removePrefix("https://").removePrefix("http://"),
                             onClick = {
-                                ShareUtils.openUrl(context, ShareUtils.WEBSITE_URL)
+                                ShareUtils.openUrl(context, settings.websiteUrl)
                             }
                         )
                         
@@ -271,8 +289,9 @@ fun AboutScreen(
                             label = rateLabel,
                             value = rateDesc,
                             onClick = {
-                                val success = ShareUtils.rateApp(context)
-                                if (!success) {
+                                if (settings.googlePlayUrl.isNotBlank()) {
+                                    ShareUtils.openUrl(context, settings.googlePlayUrl)
+                                } else {
                                     Toast.makeText(
                                         context,
                                         rateDesc,
@@ -291,9 +310,9 @@ fun AboutScreen(
                         ContactLink(
                             icon = Icons.Default.Email,
                             label = stringResource(R.string.contact_email),
-                            value = stringResource(R.string.settings_support_email_value),
+                            value = settings.supportEmail,
                             onClick = {
-                                ShareUtils.openEmail(context, ShareUtils.SUPPORT_EMAIL)
+                                ShareUtils.openEmail(context, settings.supportEmail)
                             }
                         )
                         
@@ -306,9 +325,9 @@ fun AboutScreen(
                         ContactLink(
                             icon = Icons.AutoMirrored.Filled.Send,
                             label = stringResource(R.string.contact_telegram),
-                            value = stringResource(R.string.settings_support_telegram_value),
+                            value = settings.telegramHandle,
                             onClick = {
-                                ShareUtils.openUrl(context, ShareUtils.TELEGRAM_URL)
+                                ShareUtils.openUrl(context, settings.telegramUrl)
                             }
                         )
                     }

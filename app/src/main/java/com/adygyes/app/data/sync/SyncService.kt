@@ -2,6 +2,7 @@ package com.adygyes.app.data.sync
 
 import android.content.Context
 import com.adygyes.app.data.local.dao.AttractionDao
+import com.adygyes.app.data.local.preferences.AppSettingsManager
 import com.adygyes.app.data.local.preferences.PreferencesManager
 import com.adygyes.app.data.mapper.AttractionMapper.toEntity
 import com.adygyes.app.data.remote.NetworkResult
@@ -40,6 +41,7 @@ class SyncService @Inject constructor(
     private val remoteDataSource: SupabaseRemoteDataSource,
     private val attractionDao: AttractionDao,
     private val preferencesManager: PreferencesManager,
+    private val appSettingsManager: AppSettingsManager,
     private val networkUseCase: NetworkUseCase,
     private val reviewSyncService: ReviewSyncService
 ) {
@@ -189,6 +191,15 @@ class SyncService @Inject constructor(
                 Timber.w("⚠️ Reviews sync failed, but attractions sync succeeded")
             }
             
+            // 7. Sync app settings (contacts, store links, etc.)
+            Timber.d("📥 Syncing app settings...")
+            val settingsSynced = syncAppSettings()
+            if (settingsSynced) {
+                Timber.d("✅ App settings sync complete")
+            } else {
+                Timber.w("⚠️ App settings sync skipped (no updates or error)")
+            }
+            
             Timber.d("✅ Sync complete: +$added updated=$updated deleted=${deletedIds.size} reviews=$reviewsCount")
             
             SyncResult(
@@ -272,6 +283,16 @@ class SyncService @Inject constructor(
                     // Also sync reviews
                     Timber.d("📥 Full syncing reviews...")
                     val reviewsCount = reviewSyncService.performBulkSync()
+
+                    // Also sync app settings (contacts, store links, etc.)
+                    Timber.d("📥 Full syncing app settings...")
+                    val settingsSynced = syncAppSettings()
+                    if (settingsSynced) {
+                        Timber.d("✅ Full sync - app settings updated")
+                    } else {
+                        Timber.d("ℹ️ Full sync - app settings unchanged or unavailable")
+                    }
+
                     Timber.d("✅ Full sync complete: ${attractions.size} attractions, $reviewsCount reviews")
                     
                     SyncResult(
@@ -360,6 +381,62 @@ class SyncService @Inject constructor(
         Timber.d("⏱️ Calculated new timestamp from ${attractions.size} attractions: $rawTimestamp → $normalizedTimestamp")
         
         return normalizedTimestamp
+    }
+    
+    /**
+     * Sync app settings from Supabase
+     * 
+     * Settings are managed via Admin Panel and include:
+     * - Contact info (website, email, telegram)
+     * - Store links (Google Play, App Store)
+     * - App info (version, slogan, description)
+     * - Developer info (names, roles)
+     * 
+     * @return true if settings were updated, false otherwise
+     */
+    private suspend fun syncAppSettings(): Boolean {
+        return try {
+            val result = remoteDataSource.getAppSettings()
+            
+            when (result) {
+                is NetworkResult.Success -> {
+                    val settings = result.data
+                    
+                    if (settings.isEmpty()) {
+                        Timber.d("📱 No app settings received from server")
+                        return false
+                    }
+                    
+                    // Find the latest updated_at from all settings
+                    val latestUpdatedAt = settings.mapNotNull { it.updatedAt }.maxOrNull()
+                    
+                    if (latestUpdatedAt == null) {
+                        Timber.d("📱 No timestamps in settings, skipping sync")
+                        return false
+                    }
+                    
+                    // Check if we need to update
+                    if (!appSettingsManager.needsSync(latestUpdatedAt)) {
+                        Timber.d("📱 App settings up to date (local: ${appSettingsManager.getLastUpdated()}, server: $latestUpdatedAt)")
+                        return false
+                    }
+                    
+                    // Convert to map and update
+                    val settingsMap = settings.associate { it.key to it.value }
+                    appSettingsManager.updateFromServer(settingsMap, latestUpdatedAt)
+                    
+                    Timber.d("📱 App settings updated: ${settings.size} keys, latest: $latestUpdatedAt")
+                    true
+                }
+                is NetworkResult.Error -> {
+                    Timber.w("⚠️ Failed to fetch app settings: ${result.message}")
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "❌ Error syncing app settings")
+            false
+        }
     }
     
     companion object {

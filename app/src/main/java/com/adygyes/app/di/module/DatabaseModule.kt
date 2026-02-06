@@ -10,6 +10,7 @@ import com.adygyes.app.data.local.dao.AttractionDao
 import com.adygyes.app.data.local.dao.ReviewDao
 import com.adygyes.app.data.local.database.AdygyesDatabase
 import com.adygyes.app.data.local.JsonFileManager
+import com.adygyes.app.data.local.preferences.AppSettingsManager
 import com.adygyes.app.data.local.preferences.PreferencesManager
 import com.adygyes.app.data.repository.AttractionRepositoryImpl
 import com.adygyes.app.domain.repository.AttractionRepository
@@ -96,5 +97,14 @@ object DatabaseModule {
         @ApplicationContext context: Context
     ): ImageCacheManager {
         return ImageCacheManager(context)
+    }
+    
+    @Provides
+    @Singleton
+    fun provideAppSettingsManager(
+        @ApplicationContext context: Context,
+        dataStore: DataStore<Preferences>
+    ): AppSettingsManager {
+        return AppSettingsManager(context, dataStore)
     }
 }

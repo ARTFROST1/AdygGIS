@@ -3,6 +3,7 @@ package com.adygyes.app.di.module
 import android.content.Context
 import com.adygyes.app.data.local.dao.AttractionDao
 import com.adygyes.app.data.local.dao.ReviewDao
+import com.adygyes.app.data.local.preferences.AppSettingsManager
 import com.adygyes.app.data.local.preferences.PreferencesManager
 import com.adygyes.app.data.remote.ReviewsRemoteDataSource
 import com.adygyes.app.data.remote.SupabaseRemoteDataSource
@@ -65,10 +66,19 @@ object SyncModule {
         remoteDataSource: SupabaseRemoteDataSource,
         attractionDao: AttractionDao,
         preferencesManager: PreferencesManager,
+        appSettingsManager: AppSettingsManager,
         networkUseCase: com.adygyes.app.domain.usecase.NetworkUseCase,
         reviewSyncService: ReviewSyncService
     ): SyncService {
-        return SyncService(context, remoteDataSource, attractionDao, preferencesManager, networkUseCase, reviewSyncService)
+        return SyncService(
+            context,
+            remoteDataSource,
+            attractionDao,
+            preferencesManager,
+            appSettingsManager,
+            networkUseCase,
+            reviewSyncService
+        )
     }
     
     @Provides

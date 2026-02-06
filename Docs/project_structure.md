@@ -1,14 +1,15 @@
 # Project Structure Guide
 
-**Last Updated:** 2026-01-12  
+**Last Updated:** 2026-02-06  
 **App Version:** 1.0.1 (versionCode: 3)  
-**Current Status:** Offline-first Supabase sync + Auth & Reviews integrated
+**Current Status:** Offline-first Supabase sync + Auth/Reviews + app_settings integrated
 
 > Branding: User-facing app name is "AdygGIS". Internal code/package retains "Adygyes" to avoid breaking changes.
 
 ## 🎯 Ключевые архитектурные достижения:
-- **✅ 🔐 Система авторизации (Auth):** Supabase GoTrue через Retrofit, AuthPreferencesManager для сессий
+- **✅ 🔐 Система авторизации (Auth):** Supabase GoTrue через Retrofit, SecureAuthPreferencesManager для сессий
 - **✅ ⭐ Система отзывов (Reviews):** ReviewSection, ReviewCard, WriteReviewModal с модерацией
+- **✅ ⚙️ app_settings (Admin-managed):** динамические контакты/ссылки/тексты в Settings/About/Privacy/Terms через AppSettingsManager + SyncService
 - **✅ 🎬 Премиум система анимации маркеров:** Ультра-плавная 12-кадровая анимация с предзагруженными изображениями для кинематографического UX
 - **✅ Dual-Layer Marker System:** Революционная архитектура - нативные визуальные маркеры + Compose интерактивный слой для 100% надежности кликов
 - **✅ 🆕 SearchResultsPanel:** Интерактивная панель результатов поиска с двухстадийной архитектурой (Expanded/Half), drag-жестами и умным позиционированием
@@ -47,16 +48,20 @@ AdygGIS-KT/
 │   │   │   │   │   │   │   ├── CacheManager.kt
 │   │   │   │   │   │   │   └── ImageCacheManager.kt      # ⭐ Advanced image caching
 │   │   │   │   │   │   ├── dao/          # Room DAOs
-│   │   │   │   │   │   │   └── AttractionDao.kt
+│   │   │   │   │   │   │   ├── AttractionDao.kt
+│   │   │   │   │   │   │   └── ReviewDao.kt
 │   │   │   │   │   │   ├── database/     # Room database
 │   │   │   │   │   │   │   └── AdygyesDatabase.kt
 │   │   │   │   │   │   ├── entities/     # Room entities
-│   │   │   │   │   │   │   └── AttractionEntity.kt
+│   │   │   │   │   │   │   ├── AttractionEntity.kt
+│   │   │   │   │   │   │   └── ReviewEntity.kt
 │   │   │   │   │   │   ├── locale/       # Locale management
 │   │   │   │   │   │   │   └── LocaleManager.kt
 │   │   │   │   │   │   ├── preferences/  # DataStore preferences
 │   │   │   │   │   │   │   ├── PreferencesManager.kt
-│   │   │   │   │   │   │   └── AuthPreferencesManager.kt  # 🔐 NEW: Auth session storage
+│   │   │   │   │   │   │   ├── AuthPreferencesManager.kt
+│   │   │   │   │   │   │   ├── SecureAuthPreferencesManager.kt  # 🔐 Secure auth session storage
+│   │   │   │   │   │   │   └── AppSettingsManager.kt            # ⚙️ app_settings cache (DataStore)
 │   │   │   │   │   │   └── JsonFileManager.kt  # Legacy JSON reader (fallback/seed)
 │   │   │   │   │   ├── mapper/           # Data mappers
 │   │   │   │   │   │   └── AttractionMapper.kt
@@ -72,7 +77,8 @@ AdygGIS-KT/
 │   │   │   │   │   │   │   ├── AuthDto.kt                # 🔐 Auth request/response
 │   │   │   │   │   │   │   ├── ReviewDto.kt              # ⭐ Review DTO
 │   │   │   │   │   │   │   ├── CreateReviewDto.kt        # ⭐ Review submission
-│   │   │   │   │   │   │   └── ReviewReactionDto.kt      # ⭐ Review reactions
+│   │   │   │   │   │   │   ├── ReviewReactionDto.kt      # ⭐ Review reactions
+│   │   │   │   │   │   │   └── AppSettingDto.kt          # ⚙️ app_settings DTO
 │   │   │   │   │   │   ├── SupabaseRemoteDataSource.kt
 │   │   │   │   │   │   └── ReviewsRemoteDataSource.kt    # ⭐ Reviews data source
 │   │   │   │   │   ├── repository/       # Repository implementations
@@ -186,6 +192,7 @@ AdygGIS-KT/
 │   │   │   │   │       ├── MapPreloadViewModel.kt
 │   │   │   │   │       ├── MapStateViewModel.kt
 │   │   │   │   │       ├── ReviewViewModel.kt                # ⭐ Reviews state
+│   │   │   │   │       ├── AppSettingsViewModel.kt            # ⚙️ app_settings state
 │   │   │   │   │       ├── SearchViewModel.kt
 │   │   │   │   │       ├── SettingsViewModel.kt
 │   │   │   │   │       └── ThemeViewModel.kt

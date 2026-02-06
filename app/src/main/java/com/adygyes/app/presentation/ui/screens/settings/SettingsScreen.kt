@@ -21,6 +21,7 @@ import com.adygyes.app.presentation.theme.Dimensions
 import com.adygyes.app.presentation.viewmodel.SettingsViewModel
 import com.adygyes.app.presentation.viewmodel.AuthViewModel
 import com.adygyes.app.presentation.viewmodel.AuthEvent
+import com.adygyes.app.presentation.viewmodel.AppSettingsViewModel
 import com.adygyes.app.presentation.ui.components.auth.AuthModal
 import com.adygyes.app.domain.model.AuthState
 import com.adygyes.app.presentation.viewmodel.PasswordStrength
@@ -33,6 +34,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Settings screen for app configuration and preferences
+ * 
+ * Uses AppSettingsViewModel for dynamic contact information
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,11 +45,13 @@ fun SettingsScreen(
     onNavigateToPrivacy: () -> Unit,
     onNavigateToTerms: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel(),
+    appSettingsViewModel: AppSettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val appSettings by appSettingsViewModel.settings.collectAsState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
@@ -408,7 +413,11 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_share_app),
                     subtitle = stringResource(R.string.settings_share_app_desc),
                     onClick = {
-                        ShareUtils.shareApp(context)
+                        ShareUtils.shareApp(
+                            context = context,
+                            websiteUrl = appSettings.websiteUrl,
+                            googlePlayUrl = appSettings.googlePlayUrl
+                        )
                     }
                 )
             }

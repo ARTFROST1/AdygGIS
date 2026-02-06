@@ -1,6 +1,7 @@
 package com.adygyes.app.data.remote
 
 import com.adygyes.app.data.remote.api.SupabaseApiService
+import com.adygyes.app.data.remote.dto.AppSettingDto
 import com.adygyes.app.data.remote.dto.AttractionDto
 import timber.log.Timber
 import javax.inject.Inject
@@ -135,6 +136,33 @@ class SupabaseRemoteDataSource @Inject constructor(
             }
         } catch (e: Exception) {
             Timber.e(e, "❌ Network error fetching deleted attractions")
+            NetworkResult.Error(e.message ?: "Unknown error")
+        }
+    }
+    
+    /**
+     * Fetch all app settings from centralized config table
+     * 
+     * Settings managed via Admin Panel include:
+     * - Contact info (website, email, telegram)
+     * - Store links (Google Play, App Store)
+     * - App info (version, slogan, description)
+     * - Developer info (names, roles)
+     */
+    suspend fun getAppSettings(): NetworkResult<List<AppSettingDto>> {
+        return try {
+            val response = apiService.getAppSettings()
+            
+            if (response.isSuccessful) {
+                val data = response.body() ?: emptyList()
+                Timber.d("✅ Fetched ${data.size} app settings from Supabase")
+                NetworkResult.Success(data)
+            } else {
+                Timber.e("❌ API error fetching app settings: ${response.code()} - ${response.message()}")
+                NetworkResult.Error(response.message(), response.code())
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "❌ Network error fetching app settings")
             NetworkResult.Error(e.message ?: "Unknown error")
         }
     }

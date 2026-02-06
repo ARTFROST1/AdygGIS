@@ -1,5 +1,6 @@
 package com.adygyes.app.data.remote.api
 
+import com.adygyes.app.data.remote.dto.AppSettingDto
 import com.adygyes.app.data.remote.dto.AttractionDto
 import com.adygyes.app.data.remote.dto.CreateReviewRequest
 import com.adygyes.app.data.remote.dto.CreateReviewResponse
@@ -262,4 +263,28 @@ interface SupabaseApiService {
         @Query("review_id") reviewIdFilter: String,
         @Query("select") select: String = "review_id,reaction"
     ): Response<List<ReviewReactionDto>>
+    
+    // ========== APP SETTINGS ==========
+    
+    /**
+     * Get all app settings from the centralized config table.
+     * These settings are managed via Admin Panel and synced during delta sync.
+     * RLS allows public read access.
+     */
+    @GET("rest/v1/app_settings")
+    suspend fun getAppSettings(
+        @Query("select") select: String = "key,value,updated_at",
+        @Query("order") order: String = "updated_at.desc"
+    ): Response<List<AppSettingDto>>
+    
+    /**
+     * Get app settings updated after specific timestamp (delta sync).
+     * @param updatedAt PostgREST filter (e.g., "gt.2025-01-01T00:00:00Z")
+     */
+    @GET("rest/v1/app_settings")
+    suspend fun getUpdatedAppSettings(
+        @Query("select") select: String = "key,value,updated_at",
+        @Query("updated_at") updatedAt: String,
+        @Query("order") order: String = "updated_at.asc"
+    ): Response<List<AppSettingDto>>
 }

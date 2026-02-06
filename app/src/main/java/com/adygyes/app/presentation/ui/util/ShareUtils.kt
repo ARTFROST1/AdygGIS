@@ -9,12 +9,18 @@ import com.adygyes.app.R
 
 /**
  * Utility functions for sharing app and rating in Google Play
+ * 
+ * Note: For dynamic settings from Admin Panel, use AppSettingsManager
+ * and pass URLs/emails directly to these functions.
  */
 object ShareUtils {
 
-    // Public app links/contacts (single source of truth)
+    // Fallback values (used if dynamic settings not available)
+    @Deprecated("Use AppSettingsManager for dynamic values")
     const val WEBSITE_URL = "https://adyggis.vercel.app"
+    @Deprecated("Use AppSettingsManager for dynamic values")
     const val SUPPORT_EMAIL = "frostmoontechsmc@gmail.com"
+    @Deprecated("Use AppSettingsManager for dynamic values")
     const val TELEGRAM_URL = "https://t.me/MaykopTech"
 
     // Google Play (fill these when the app is published)
@@ -25,10 +31,12 @@ object ShareUtils {
     /**
      * Share app with others via system share dialog
      * @param context Android context
+     * @param websiteUrl Website URL (from AppSettingsManager)
+     * @param googlePlayUrl Google Play URL (from AppSettingsManager)
      */
-    fun shareApp(context: Context) {
-        val googlePlayLine = if (GOOGLE_PLAY_WEB_URL.isNotBlank()) {
-            "\n\n📱 Google Play: $GOOGLE_PLAY_WEB_URL"
+    fun shareApp(context: Context, websiteUrl: String = WEBSITE_URL, googlePlayUrl: String = GOOGLE_PLAY_WEB_URL) {
+        val googlePlayLine = if (googlePlayUrl.isNotBlank()) {
+            "\n\n📱 Google Play: $googlePlayUrl"
         } else {
             ""
         }
@@ -36,7 +44,7 @@ object ShareUtils {
         val shareText = """
             Попробуйте AdygGIS - приложение для изучения достопримечательностей Адыгеи!
             
-            🌐 Сайт: $WEBSITE_URL$googlePlayLine
+            🌐 Сайт: $websiteUrl$googlePlayLine
         """.trimIndent()
         
         val shareIntent = Intent().apply {

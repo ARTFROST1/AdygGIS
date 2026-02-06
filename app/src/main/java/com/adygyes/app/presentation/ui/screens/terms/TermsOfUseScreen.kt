@@ -16,26 +16,34 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.adygyes.app.R
 import com.adygyes.app.presentation.theme.Dimensions
 import com.adygyes.app.presentation.ui.components.info.ExpandableSection
 import com.adygyes.app.presentation.ui.components.info.ContactLink
 import com.adygyes.app.presentation.ui.components.info.InfoCard
 import com.adygyes.app.presentation.ui.util.ShareUtils
+import com.adygyes.app.presentation.viewmodel.AppSettingsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * Terms of Use screen with expandable sections
  * Modern design following best practices
+ * 
+ * Uses AppSettingsViewModel for dynamic contact information
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TermsOfUseScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    viewModel: AppSettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    
+    // App settings from Admin Panel
+    val settings by viewModel.settings.collectAsState()
     
     // Protection against double-click
     var isNavigating by remember { mutableStateOf(false) }
@@ -179,9 +187,9 @@ fun TermsOfUseScreen(
                         ContactLink(
                             icon = Icons.AutoMirrored.Filled.Send,
                             label = stringResource(R.string.contact_telegram),
-                            value = stringResource(R.string.settings_support_telegram_value),
+                            value = settings.telegramHandle,
                             onClick = {
-                                ShareUtils.openUrl(context, ShareUtils.TELEGRAM_URL)
+                                ShareUtils.openUrl(context, settings.telegramUrl)
                             }
                         )
                     }
